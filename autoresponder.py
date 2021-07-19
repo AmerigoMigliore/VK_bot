@@ -1,3 +1,5 @@
+import re
+
 from games import *
 import json
 import random
@@ -13,7 +15,7 @@ def get_points(gamer):
 
 class Autoresponder:
     """Класс ответов на сообщения пользователей"""
-    answers: dict[str, list[str]] = {}
+    answers = {}
     commands = {}
     errors = {}
     gamers_id = {}
@@ -64,6 +66,7 @@ class Autoresponder:
                 self.gamers_id = set(json.load(read_file).get('stats').keys())
             read_file.close()
 
+        # Если пользователь НЕ играет, обработать его сообщение как запрос
         if str(user_id) not in self.gamers_id:
             keyboard = {
                 "one_time": False,
@@ -74,22 +77,30 @@ class Autoresponder:
             keyboard = str(json.dumps(keyboard, ensure_ascii=False))
 
             if msg == "" or not is_command(msg):
+                # Удаление лишних небуквенных символов
+                msg = "".join(filter(str.isalpha, msg))
                 if msg != "":
+                    # Получение списка всех возможных ответов на данный запрос
                     answer = self.answers.get(msg.lower())
                     if answer is None:
                         answer = self.errors[0]
                     else:
+                        # Случайный выбор ответа из полученного списка
                         answer = answer[random.randint(0, len(answer) - 1)]
                 else:
                     answer = self.errors[0]
 
+                # Если ответ - стикер (формат: ##ID, где ID - id стикера)
                 if answer[0:2] == "##":
                     vk_session.method('messages.send',
                                       {'user_id': user_id, 'sticker_id': answer[2:], 'random_id': 0,
                                        'keyboard': keyboard})
+                # Если ответ - не стикер
                 else:
                     vk_session.method('messages.send',
                                       {'user_id': user_id, 'message': answer, 'random_id': 0, 'keyboard': keyboard})
+
+                    # Выбор случайного стикера из диапазона id: 1..100, если включен ответ со случайными стикерами
                     if self.is_stickers_active:
                         flag = True
                         while flag:
@@ -102,6 +113,7 @@ class Autoresponder:
                             except:
                                 print('Недоступно: ' + str(rand))
                                 flag = True
+            # Если полученное сообщение - команда (формат: !команда, где команда - текст команды)
             else:
                 message = self.readCommand(msg)
                 if message is None:
@@ -109,6 +121,7 @@ class Autoresponder:
                 vk_session.method('messages.send',
                                   {'user_id': user_id, 'message': message, 'random_id': 0,
                                    'keyboard': keyboard})
+        # Если пользователь играет - переадресовать сообщение методу Games.handler
         else:
             self.game_class.handler(user_id, msg)
 
