@@ -1,5 +1,3 @@
-import re
-
 from games import *
 import json
 import random
@@ -11,6 +9,10 @@ def is_command(msg):
 
 def get_points(gamer):
     return gamer[1]
+
+
+def is_correct_character(character):
+    return str.isalpha(character) or character == ' '
 
 
 class Autoresponder:
@@ -78,7 +80,7 @@ class Autoresponder:
 
             if msg == "" or not is_command(msg):
                 # Удаление лишних небуквенных символов
-                msg = "".join(filter(str.isalpha, msg))
+                msg = "".join(filter(is_correct_character, msg))
                 if msg != "":
                     # Получение списка всех возможных ответов на данный запрос
                     answer = self.answers.get(msg.lower())
@@ -134,33 +136,46 @@ class Autoresponder:
             return self.errors[1]
 
     def addResponse(self, arg):
+        # Проверка на пустоту аргумента запроса и ответов
         if arg.count('\n') == 0:
             return self.errors[2]
 
+        # Разделение аргумента по строкам. Первая строка - запрос; последующие - ответы
         split = arg.split('\n')
-        request = split[0].strip().lower()
-        responses = list()
-        stringResponses = str()
 
+        # Извлечение запроса и удаление лишних небуквенных символов
+        request = "".join(filter(is_correct_character, split[0].strip().lower()))
+
+        # Проверка запроса на корректность
         if len(request) == 0:
             return self.errors[2]
 
-        for i in range(1, len(split)):
-            if len(split[i].strip()) < 2:
-                return self.errors[3]
-            responses.append(split[i].strip())
-            stringResponses += '\n\"' + split[i].strip() + '\"'
+        responses = list()
+        string_added_responses = str()
+        string_invalid_responses = str()
 
+        # Проход по всем ответам и их запись в словарь ответов и строку для ответа пользователю
+        for i in range(1, len(split)):
+            if len(split[i].strip()) < 2 or \
+                    (self.answers.get(request) is not None and split[i].strip() in self.answers.get(request)):
+                string_invalid_responses += '\n\"' + split[i].strip() + '\"'
+            else:
+                responses.append(split[i].strip())
+                string_added_responses += '\n\"' + split[i].strip() + '\"'
+
+        # Получение уже имеющихся ответов по данному запросу и добавление новых ответов
         allResponses = self.answers.get(request)
         if allResponses is None:
             allResponses = list()
         allResponses.extend(responses)
         self.answers.update({request: allResponses})
 
+        # Сохранение нового словаря в answers.json
         with open("answers.json", "w") as write_file:
             json.dump(self.answers, write_file)
             write_file.close()
-        return "На запрос \"" + request.capitalize() + "\" добавлены ответы: " + stringResponses
+        return "На запрос \"" + request.capitalize() + "\" добавлены ответы: " + string_added_responses + \
+               "\n\n Проигнорированы ответы: " + string_invalid_responses
 
     def deleteResponse(self, arg):
         if arg.count('\n') == 0:
@@ -213,12 +228,14 @@ class Autoresponder:
         stringRequests = str()
         for request in self.answers.keys():
             stringRequests += request.capitalize() + '\n'
-            # allResponses = self.answers.get(request)
-            # for response in allResponses:
-            #     if response[0:2] == "##":
-            #         response = "Стикер №" + response[2:]
-            #     stringRequests += "-" + response + "\n"
-            # stringRequests += "\n"
+
+            # Показ всех ответов на запросы
+            allResponses = self.answers.get(request)
+            for response in allResponses:
+                if response[0:2] == "##":
+                    response = "Стикер №" + response[2:]
+                stringRequests += "-" + response + "\n"
+            stringRequests += "\n"
 
         return stringRequests
 
