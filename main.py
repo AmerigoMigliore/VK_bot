@@ -19,18 +19,7 @@ def main():
         try:
             for event in longpoll.listen():
                 if event.type == VkEventType.MESSAGE_NEW and event.to_me:
-
-                    # TODO: vvv Обработка сообщений во время тестирования УБРАТЬ ПРИ СОХРАНЕНИИ
-                    if event.user_id != 171254367:
-                        vk_session.method('messages.send',
-                                          {'user_id': event.user_id,
-                                           'message': "Меня тут пока что улучшают, и я не могу отвечать."
-                                                      "\nПопробуй написать мне немного позднее", 'random_id': 0})
-                        vk_session.method('messages.send',
-                                          {'user_id': event.user_id, 'random_id': 0, 'sticker_id': 58715})
-                        break
-                    # TODO: ^^^ УБРАТЬ ПРИ СОХРАНЕНИИ
-
+                    
                     # Регистрация пользователей при первом запросе
                     if event.user_id not in users:
                         with open("users_id.json", "w") as write_file:

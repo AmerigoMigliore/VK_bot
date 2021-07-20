@@ -30,7 +30,7 @@ def minus(rand_min, rand_max):
     return [a, b, a - b]
 
 
-def multiplication (rand_min, rand_max):
+def multiplication(rand_min, rand_max):
     a = random.randint(rand_min, rand_max)
     b = random.randint(rand_min, rand_max)
     return [a, b, a * b]
@@ -60,7 +60,8 @@ class Games:
             'Успеешь выбрать правильный - получишь следующий пример.\n'
             'Не успеешь - игра окончена.\n'
             'В игре несколько уровней, и каждый новый вносит усложнения примеров.\n'
-            'Между уровнями у тебя будет время на перерыв. Рекомендую отдыхать секунд 10-20, чтобы злой VK не просил тебя ввести капчу.'
+            'Между уровнями у тебя будет время на перерыв. '
+            'Рекомендую отдыхать секунд 10-20, чтобы злой VK не просил тебя ввести капчу.'
             'Ну, и чтобы я успел составить еще примерчиков!\n\n'
             'Если все понятно - жми кнопку и погнали!',
             # 2
@@ -180,10 +181,11 @@ class Games:
         if self.gamers_stats.get(user_id).get('score') % 5 == 0 and answer.lower() == "":
 
             vk_session.method('messages.send',
-                              {'user_id': int(user_id), 'message': "Вы перешли на уровень " + str(
-                                  self.gamers_stats.get(user_id).get('score') // 5) + 
-                                  "\nРекомендую отдохнуть 10-20 секунд!",
+                              {'user_id': int(user_id), 'message': "Вы перешли на уровень " +
+                                                        str(self.gamers_stats.get(user_id).get('score') // 5) +
+                                                        "\nРекомендую отдохнуть 10-20 секунд!",
                                'random_id': 0, 'keyboard': self.continue_game_keyboard})
+
 
         elif self.gamers_stats.get(user_id).get('answer') is None:
             self.new_formula(user_id)
