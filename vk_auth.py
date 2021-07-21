@@ -1,8 +1,7 @@
-from vk_api.longpoll import VkLongPoll, VkEventType
-from no_git_data import token
 import vk_api
-
+from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
+from no_git_data import token
 
 vk_session = vk_api.VkApi(token=token)
 session_api = vk_session.get_api()
-longpoll = VkLongPoll(vk_session)
+longpoll = VkBotLongPoll(vk_session, 205785357)

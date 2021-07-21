@@ -1,5 +1,4 @@
 import random
-
 from vk_auth import *
 from keyboard import *
 import json
@@ -11,8 +10,11 @@ def create_keyboard(nums):
         {
             "inline": True,
             "buttons": [
-                [get_text_button(f'{nums[0]}', 'positive'), get_text_button(f'{nums[1]}', 'positive')],
-                [get_text_button(f'{nums[2]}', 'positive'), get_text_button(f'{nums[3]}', 'positive')]
+                [get_callback_button(f'{nums[0]}', 'positive', {"method": "GameMath.game", "args": nums[0]}),
+                 get_callback_button(f'{nums[1]}', 'positive', {"method": "GameMath.game", "args": nums[1]})],
+
+                [get_callback_button(f'{nums[2]}', 'positive', {"method": "GameMath.game", "args": nums[2]}),
+                 get_callback_button(f'{nums[3]}', 'positive', {"method": "GameMath.game", "args": nums[3]})]
             ]
         },
         ensure_ascii=False))
@@ -42,7 +44,11 @@ def division(rand_min, rand_max):
     return [a * b, a, b]
 
 
-class Games:
+def get_points(gamer):
+    return gamer[1]
+
+
+class GameMath:
     texts = []
     start_keyboard = []
     end_keyboard = []
@@ -60,8 +66,8 @@ class Games:
             'Успеешь выбрать правильный - получишь следующий пример.\n'
             'Не успеешь - игра окончена.\n'
             'В игре несколько уровней, и каждый новый вносит усложнения примеров.\n'
-            'Между уровнями у тебя будет время на перерыв. '
-            'Рекомендую отдыхать секунд 10-20, чтобы злой VK не просил тебя ввести капчу.'
+            'Между уровнями у тебя будет время на перерыв.\n'
+            'Рекомендую отдыхать секунд 10-20, чтобы злой VK не просил тебя ввести капчу. '
             'Ну, и чтобы я успел составить еще примерчиков!\n\n'
             'Если все понятно - жми кнопку и погнали!',
             # 2
@@ -114,7 +120,7 @@ class Games:
             },
             ensure_ascii=False))
 
-        # Инициализация gamers_active.json TODO: сюда можно пристроить end'ы для игравших во время стопа бота
+        # Инициализация gamers_active.json TODO: сюда можно пристроить self.end() для игравших во время стопа бота
         with open("gamers_active.json", "r") as read_file:
             if len(read_file.read()) != 0:
                 read_file.seek(0)
@@ -153,8 +159,8 @@ class Games:
         if user_id in self.timers.keys():
             self.timers.pop(user_id)
         vk_session.method('messages.send',
-                          {'user_id': int(user_id), 'message': self.texts[2] + " Вы набрали " + str(
-                              self.gamers_stats.get(user_id).get('score')) + " баллов!",
+                          {'user_id': int(user_id), 'message': "{}\nВсего правильных ответов: {}"
+                                                    .format(self.texts[2], self.gamers_stats.get(user_id).get('score')),
                            'random_id': 0, 'keyboard': self.end_keyboard})
         self.save(user_id, True)
 
@@ -178,17 +184,20 @@ class Games:
                            'random_id': 0, 'keyboard': self.start_keyboard})
 
     def game(self, user_id, answer):
+        user_id = str(user_id)
+        answer = str(answer)
+
         if self.gamers_stats.get(user_id).get('score') % 5 == 0 and answer.lower() == "":
 
             vk_session.method('messages.send',
-                              {'user_id': int(user_id), 'message': "Вы перешли на уровень " +
-                                                        str(self.gamers_stats.get(user_id).get('score') // 5) +
-                                                        "\nРекомендую отдохнуть 10-20 секунд!",
+                              {'user_id': int(user_id), 'message': "Вы перешли на уровень {}"
+                                                                   "\nРекомендую отдохнуть 10-20 секунд!"
+                                                        .format(self.gamers_stats.get(user_id).get('score') // 5),
                                'random_id': 0, 'keyboard': self.continue_game_keyboard})
-
 
         elif self.gamers_stats.get(user_id).get('answer') is None:
             self.new_formula(user_id)
+
         elif str(self.gamers_stats.get(user_id).get('answer')) == answer:
             try:
                 self.timers.get(user_id).cancel()
@@ -197,13 +206,17 @@ class Games:
             self.gamers_stats.update(
                 {user_id: {'answer': None, 'score': self.gamers_stats.get(user_id).get('score') + 1}})
             vk_session.method('messages.send',
-                              {'user_id': int(user_id), 'message': "Верно!\nВы дали правильных ответов: "
-                                                                   + str(
-                                  self.gamers_stats.get(user_id).get('score')) + "!",
+                              {'user_id': int(user_id), 'message': "Ваш ответ {} верный!\nВсего правильных ответов: {}!"
+                                                        .format(answer, self.gamers_stats.get(user_id).get('score')),
                                'random_id': 0})
             self.game(user_id, "")
+
         else:
             self.timers.get(user_id).cancel()
+            vk_session.method('messages.send',
+                              {'user_id': int(user_id), 'message': "Ваш ответ {} неверный!\nВерный ответ: {}!"
+                                                        .format(answer, self.gamers_stats.get(user_id).get('answer')),
+                               'random_id': 0})
             self.end(user_id)
 
     def new_formula(self, user_id):
@@ -216,13 +229,13 @@ class Games:
 
         action = random.choice(self.game_levels.get(level).get("actions"))
         if action == plus:
-            symbol = ' + '
+            symbol = '+'
         elif action == minus:
-            symbol = ' - '
+            symbol = '-'
         elif action == multiplication:
-            symbol = ' * '
+            symbol = '*'
         elif action == division:
-            symbol = ' / '
+            symbol = '/'
         formula = action(rand_min, rand_max)
         num2 = num3 = num4 = res = formula[2]
 
@@ -236,11 +249,30 @@ class Games:
 
         vk_session.method('messages.send',
                           {'user_id': int(user_id), 'message': "Уровень " + str(level) +
-                                                               "\nСколько будет " + str(formula[0]) + symbol +
-                                                               str(formula[1]) + "?",
+                                                               "\nСколько будет {} {} {}?"
+                                                    .format(formula[0], symbol, formula[1]),
                            'random_id': 0, 'keyboard': create_keyboard(nums)})
 
         self.gamers_stats.update({user_id: {'answer': res, 'score': self.gamers_stats.get(user_id).get('score')}})
 
         self.timers.update({user_id: threading.Timer(5, self.end, {user_id})})
         self.timers.get(user_id).start()
+
+    @staticmethod
+    def get_top(arg=None):
+        with open("gamers_active.json", "r") as read_file:
+            top = json.load(read_file).get('top')
+            read_file.close()
+        top_sort = []
+        for gamer in top:
+            top_sort.append([gamer, top.get(gamer)])
+        top_sort.sort(key=get_points, reverse=True)
+        string_top = str()
+        for gamer in top_sort:
+            user = vk_session.method('users.get', {'user_ids': int(gamer[0])})[0]
+            name = user.get('first_name') + ' ' + user.get('last_name')
+            string_top += "[id" + gamer[0] + "|" + name + "]" + "\n Верных ответов: " + str(gamer[1]) + "\n\n"
+        # Минутка хвастовства
+        if top_sort[0][0] == "171254367":
+            string_top += "О, мой хозяин на первом месте!&#128526;"
+        return string_top

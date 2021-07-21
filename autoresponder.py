@@ -1,14 +1,13 @@
-from games import *
+from game_math import GameMath
+from vk_auth import *
+from keyboard import *
+import threading
 import json
 import random
 
 
 def is_command(msg):
     return msg[0] == '!'
-
-
-def get_points(gamer):
-    return gamer[1]
 
 
 def is_correct_character(character):
@@ -20,9 +19,9 @@ class Autoresponder:
     answers = {}
     commands = {}
     errors = {}
-    gamers_id = {}
-    user_id = 0
-    game_class = Games()
+    gamer_math_ids = {}
+    user_id = 0  # TODO: Нехорошо так хранить
+    game_math_class = GameMath()
 
     is_stickers_active = False
 
@@ -42,8 +41,8 @@ class Autoresponder:
                          '!все запросы': [self.getAllRequests, ""],
                          '!все команды': [self.getAllCommands, ""],
                          '!стикеры': [self.stickers, "\n1 - включить; 0 - выключить"],
-                         '!играть': [self.game, ""],
-                         '!рейтинг': [self.get_top, ""],
+                         '!играть': [self.game_math_start, ""],
+                         '!рейтинг': [self.game_math_class.get_top, ""],
                          '!таймер': [self.timer, "\nЧисло секунд"]
                          }
         self.errors = [
@@ -62,14 +61,14 @@ class Autoresponder:
 
         with open("gamers_active.json", "r") as read_file:
             if len(json.load(read_file).get('stats')) == 0:
-                self.gamers_id = {}
+                self.gamer_math_ids = {}
             else:
                 read_file.seek(0)
-                self.gamers_id = set(json.load(read_file).get('stats').keys())
+                self.gamer_math_ids = set(json.load(read_file).get('stats').keys())
             read_file.close()
 
         # Если пользователь НЕ играет, обработать его сообщение как запрос
-        if str(user_id) not in self.gamers_id:
+        if str(user_id) not in self.gamer_math_ids:
             keyboard = {
                 "one_time": False,
                 "buttons": [
@@ -123,9 +122,9 @@ class Autoresponder:
                 vk_session.method('messages.send',
                                   {'user_id': user_id, 'message': message, 'random_id': 0,
                                    'keyboard': keyboard})
-        # Если пользователь играет - переадресовать сообщение методу Games.handler
+        # Если пользователь играет - переадресовать сообщение методу GameMath.handler
         else:
-            self.game_class.handler(user_id, msg)
+            self.game_math_class.handler(user_id, msg)
 
     def readCommand(self, msg):
         cmd = msg.split('\n')[0].strip().lower()
@@ -229,13 +228,13 @@ class Autoresponder:
         for request in self.answers.keys():
             stringRequests += request.capitalize() + '\n'
 
-            # Показ всех ответов на запросы
-            allResponses = self.answers.get(request)
-            for response in allResponses:
-                if response[0:2] == "##":
-                    response = "Стикер №" + response[2:]
-                stringRequests += "-" + response + "\n"
-            stringRequests += "\n"
+            # # Показ всех ответов на запросы
+            # allResponses = self.answers.get(request)
+            # for response in allResponses:
+            #     if response[0:2] == "##":
+            #         response = "Стикер №" + response[2:]
+            #     stringRequests += "-" + response + "\n"
+            # stringRequests += "\n"
 
         return stringRequests
 
@@ -290,24 +289,5 @@ class Autoresponder:
         count += 1
         threading.Timer(1, self.timer, args=[arg, count, message]).start()
 
-    def game(self, arg=None):
-        self.game_class.start(self.user_id)
-
-    @staticmethod
-    def get_top(arg=None):
-        with open("gamers_active.json", "r") as read_file:
-            top = json.load(read_file).get('top')
-            read_file.close()
-        top_sort = []
-        for gamer in top:
-            top_sort.append([gamer, top.get(gamer)])
-        top_sort.sort(key=get_points, reverse=True)
-        string_top = str()
-        for gamer in top_sort:
-            user = vk_session.method('users.get', {'user_ids': int(gamer[0])})[0]
-            name = user.get('first_name') + ' ' + user.get('last_name')
-            string_top += "[id" + gamer[0] + "|" + name + "]" + "\n Верных ответов: " + str(gamer[1]) + "\n\n"
-        # Минутка хвастовства
-        if top_sort[0][0] == "171254367":
-            string_top += "О, мой хозяин на первом месте!&#128526;"
-        return string_top
+    def game_math_start(self, arg=None):
+        self.game_math_class.start(self.user_id)
