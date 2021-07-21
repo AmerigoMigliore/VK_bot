@@ -228,13 +228,14 @@ class Autoresponder:
         for request in self.answers.keys():
             stringRequests += request.capitalize() + '\n'
 
-            # # Показ всех ответов на запросы
-            # allResponses = self.answers.get(request)
-            # for response in allResponses:
-            #     if response[0:2] == "##":
-            #         response = "Стикер №" + response[2:]
-            #     stringRequests += "-" + response + "\n"
-            # stringRequests += "\n"
+            # Показ всех ответов на запросы
+            if arg == "admin":
+                allResponses = self.answers.get(request)
+                for response in allResponses:
+                    if response[0:2] == "##":
+                        response = "Стикер №" + response[2:]
+                    stringRequests += "-" + response + "\n"
+                stringRequests += "\n"
 
         return stringRequests
 
