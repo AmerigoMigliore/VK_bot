@@ -42,7 +42,7 @@ class Autoresponder:
                          '!все команды': [self.getAllCommands, ""],
                          '!стикеры': [self.stickers, "\n1 - включить; 0 - выключить"],
                          '!играть': [self.game_math_start, ""],
-                         # '!рейтинг': [self.game_math_class.get_top, ""],
+                         '!рейтинг': [self.game_math_class.get_top, ""],
                          '!таймер': [self.timer, "\nЧисло секунд"]
                          }
         self.errors = [

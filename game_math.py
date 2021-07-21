@@ -268,10 +268,13 @@ class GameMath:
             top_sort.append([gamer, top.get(gamer)])
         top_sort.sort(key=get_points, reverse=True)
         string_top = str()
+
+        num = 0
         for gamer in top_sort:
+            num += 1
             user = vk_session.method('users.get', {'user_ids': int(gamer[0])})[0]
             name = user.get('first_name') + ' ' + user.get('last_name')
-            string_top += "[id" + gamer[0] + "|" + name + "]" + "\n Верных ответов: " + str(gamer[1]) + "\n\n"
+            string_top += "{}. {}:\n Верных ответов: {}\n\n".format(num, name, gamer[1])
         # Минутка хвастовства
         if top_sort[0][0] == "171254367":
             string_top += "О, мой хозяин на первом месте!&#128526;"
