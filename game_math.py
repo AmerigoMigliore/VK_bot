@@ -104,7 +104,7 @@ class GameMath:
 
         self.end_keyboard = str(json.dumps(
             {
-                "one_time": False,
+                "inline": True,
                 "buttons": [
                     [get_text_button('!Играть', 'positive'), get_text_button('!Рейтинг', 'primary')]
                 ]
