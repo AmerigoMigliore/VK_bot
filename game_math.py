@@ -272,9 +272,10 @@ class GameMath:
         num = 0
         for gamer in top_sort:
             num += 1
-            user = vk_session.method('users.get', {'user_ids': int(gamer[0])})[0]
-            name = user.get('first_name') + ' ' + user.get('last_name')
-            string_top += "{}. {}:\n Верных ответов: {}\n\n".format(num, name, gamer[1])
+            # user = vk_session.method('users.get', {'user_ids': int(gamer[0])})[0]
+            # name = user.get('first_name') + ' ' + user.get('last_name')
+            # string_top += "{}. {}:\n Верных ответов: {}\n\n".format(num, name, gamer[1])
+            string_top += "{} место:\n Верных ответов: {}\n\n".format(num, gamer[1])
         # Минутка хвастовства
         if top_sort[0][0] == "171254367":
             string_top += "О, мой хозяин на первом месте!&#128526;"

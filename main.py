@@ -20,16 +20,16 @@ def main():
             for event in longpoll.listen():
                 if event.type == VkBotEventType.MESSAGE_NEW and event.from_user:
 
-                    # # TODO: vvv Обработка сообщений во время тестирования УБРАТЬ ПРИ СОХРАНЕНИИ
-                    # if event.obj.from_id != 171254367:
-                    #     vk_session.method('messages.send',
-                    #                       {'user_id': event.obj.from_id,
-                    #                        'message': "Меня тут пока что улучшают, и я не могу отвечать."
-                    #                                   "\nПопробуй написать мне немного позднее", 'random_id': 0})
-                    #     vk_session.method('messages.send',
-                    #                       {'user_id': event.obj.from_id, 'random_id': 0, 'sticker_id': 58715})
-                    #     break
-                    # # TODO: ^^^ УБРАТЬ ПРИ СОХРАНЕНИИ
+                    # TODO: vvv Обработка сообщений во время тестирования УБРАТЬ ПРИ СОХРАНЕНИИ
+                    if event.obj.from_id != 171254367:
+                        vk_session.method('messages.send',
+                                          {'user_id': event.obj.from_id,
+                                           'message': "Меня тут пока что улучшают, и я не могу отвечать."
+                                                      "\nПопробуй написать мне немного позднее", 'random_id': 0})
+                        vk_session.method('messages.send',
+                                          {'user_id': event.obj.from_id, 'random_id': 0, 'sticker_id': 58715})
+                        break
+                    # TODO: ^^^ УБРАТЬ ПРИ СОХРАНЕНИИ
 
                     # Регистрация пользователей при первом запросе
                     if event.obj.from_id not in users:
@@ -49,8 +49,7 @@ def main():
                     # Основная обработка сообщений
                     else:
                         try:
-                            thread = Thread(target=autoresponder.respond, args=(event.obj.from_id, message))
-                            thread.start()
+                            autoresponder.respond(event.obj.from_id, message)
                         except Exception:
                             vk_session.method('messages.send',
                                               {'user_id': event.obj.from_id, 'message':
@@ -76,15 +75,6 @@ def main():
                                            'user_id': event.obj.user_id,
                                            'peer_id': event.obj.peer_id})
 
-                # Встречалка при печатании
-                # users_have_written = []
-                # if event.type == VkBotEventType.USER_TYPING:
-                #     if event.obj.from_id not in users_have_written:
-                #         users_have_written.append(event.obj.from_id)
-                #         vk_session.method('messages.send',
-                #                           {'user_id': event.obj.from_id, 'message':
-                #                               "Привет!\nЯ очень рад, что про меня вспомнили!\nНо ты пиши, не отвлекайся",
-                #                            'random_id': 0})
         except Exception:
             pass
 
