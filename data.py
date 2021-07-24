@@ -23,12 +23,17 @@ with open("gamers_active.json", "r", encoding='utf-8') as read_file:
     read_file.close()
 
 
-def save_all():
+def save_all(is_finally=False):
     with open("gamers_active.json", "w") as write_file:
         json.dump({'stats': game_math_stats, 'top': game_math_top}, write_file)
         write_file.close()
     print("All data has been saved!")
+    if not is_finally:
+        set_next_save_all()
+
+
+def set_next_save_all():
     threading.Timer(60, save_all).start()
 
 
-threading.Timer(60, save_all).start()
+set_next_save_all()

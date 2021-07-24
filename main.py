@@ -83,8 +83,7 @@ def main():
 try:
     main()
 except KeyboardInterrupt:
-    print("KeyboardInterrupt")
     raise
 finally:
-    save_all()
-    print("Bye!")
+    save_all(True)
+    print("\033[32m\033[47mBye!")
