@@ -33,7 +33,7 @@ def save_all(is_finally=False):
 
 
 def set_next_save_all():
-    threading.Timer(60, save_all).start()
+    threading.Timer(1800, save_all).start()
 
 
 set_next_save_all()
