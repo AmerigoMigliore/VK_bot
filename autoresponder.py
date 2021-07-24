@@ -1,6 +1,7 @@
 from game_math import GameMath
 from vk_auth import *
 from keyboard import *
+from data import game_math_stats
 import threading
 import json
 import random
@@ -19,7 +20,6 @@ class Autoresponder:
     answers = {}
     commands = {}
     errors = {}
-    gamer_math_ids = {}  # TODO: data
     user_id = 0  # TODO: Нехорошо так хранить
     game_math_class = GameMath()
 
@@ -59,16 +59,8 @@ class Autoresponder:
     def respond(self, user_id, msg):
         self.user_id = user_id
 
-        with open("gamers_active.json", "r") as read_file:
-            if len(json.load(read_file).get('stats')) == 0:
-                self.gamer_math_ids = {}
-            else:
-                read_file.seek(0)
-                self.gamer_math_ids = set(json.load(read_file).get('stats').keys())
-            read_file.close()
-
         # Если пользователь НЕ играет, обработать его сообщение как запрос
-        if str(user_id) not in self.gamer_math_ids:
+        if str(user_id) not in game_math_stats.keys():
             keyboard = {
                 "one_time": False,
                 "buttons": [

@@ -1,12 +1,12 @@
 import sys
-from threading import Thread
+from data import *
 from autoresponder import *
-
-autoresponder = Autoresponder()
-methods = {"GameMath.game": autoresponder.game_math_class.game}
 
 
 def main():
+    autoresponder = Autoresponder()
+    methods = {"GameMath.game": autoresponder.game_math_class.game}
+
     with open("users_id.json", "r") as read_file:
         if len(read_file.read()) == 0:
             users = list()
@@ -75,8 +75,13 @@ def main():
                                            'user_id': event.obj.user_id,
                                            'peer_id': event.obj.peer_id})
 
+        # Обработка длительного ожидания от longpoll
         except Exception:
             pass
 
 
-main()
+try:
+    main()
+finally:
+    save_all()
+    print("Bye!")
