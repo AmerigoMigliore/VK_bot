@@ -40,7 +40,9 @@ def save_all(is_finally=False):
     else:
         if timer is not None:
             timer.cancel()
-    print("All data has been saved!")
+    print("\n\033[1m\033[32m\033[40m"
+          "All data has been saved!"
+          "\033[0m")
 
 
 set_next_save_all()
