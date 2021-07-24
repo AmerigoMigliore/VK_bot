@@ -252,12 +252,9 @@ class GameMath:
 
     @staticmethod
     def get_top(arg=None):
-        with open("gamers_active.json", "r", encoding='utf-8') as read_file:
-            top = json.load(read_file).get('top')
-            read_file.close()
         top_sort = []
-        for gamer in top:
-            top_sort.append([top.get(gamer).get('name'), top.get(gamer).get('record')])
+        for gamer in game_math_top.values():
+            top_sort.append([gamer.get('name'), gamer.get('record')])
         top_sort.sort(key=get_points, reverse=True)
 
         string_top = str()
@@ -265,6 +262,7 @@ class GameMath:
         for gamer in top_sort:
             num += 1
             string_top += "{}. {}:\n Верных ответов: {}\n\n".format(num, gamer[0], gamer[1])
+
         # Минутка хвастовства
         if top_sort[0][0] == "Александр Березин":
             string_top += "О, мой хозяин на первом месте!&#128526;"
