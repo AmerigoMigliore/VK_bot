@@ -4,6 +4,7 @@ import threading
 """ID всех, кто сейчас играет в GameMath"""
 game_math_stats = {}
 game_math_top = {}
+global timer
 
 with open("gamers_active.json", "r", encoding='utf-8') as read_file:
     if len(json.load(read_file)) == 0:
@@ -23,17 +24,21 @@ with open("gamers_active.json", "r", encoding='utf-8') as read_file:
     read_file.close()
 
 
+def set_next_save_all():
+    timer = threading.Timer(1800, save_all)
+    timer.start()
+
+
 def save_all(is_finally=False):
     with open("gamers_active.json", "w") as write_file:
         json.dump({'stats': game_math_stats, 'top': game_math_top}, write_file)
         write_file.close()
-    print("All data has been saved!")
     if not is_finally:
         set_next_save_all()
-
-
-def set_next_save_all():
-    threading.Timer(1800, save_all).start()
+    else:
+        if timer is not None:
+            timer.cancel()
+    print("All data has been saved!")
 
 
 set_next_save_all()
