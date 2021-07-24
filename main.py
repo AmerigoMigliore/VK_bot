@@ -82,6 +82,9 @@ def main():
 
 try:
     main()
+except KeyboardInterrupt:
+    print("KeyboardInterrupt")
+    raise
 finally:
     save_all()
     print("Bye!")
