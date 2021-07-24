@@ -1,5 +1,6 @@
 no_git*
 *.json
+сохранения
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
