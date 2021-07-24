@@ -19,7 +19,7 @@ class Autoresponder:
     answers = {}
     commands = {}
     errors = {}
-    gamer_math_ids = {}
+    gamer_math_ids = {}  # TODO: data
     user_id = 0  # TODO: Нехорошо так хранить
     game_math_class = GameMath()
 

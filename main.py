@@ -20,16 +20,16 @@ def main():
             for event in longpoll.listen():
                 if event.type == VkBotEventType.MESSAGE_NEW and event.from_user:
 
-                    # TODO: vvv Обработка сообщений во время тестирования УБРАТЬ ПРИ СОХРАНЕНИИ
-                    if event.obj.from_id != 171254367:
-                        vk_session.method('messages.send',
-                                          {'user_id': event.obj.from_id,
-                                           'message': "Меня тут пока что улучшают, и я не могу отвечать."
-                                                      "\nПопробуй написать мне немного позднее", 'random_id': 0})
-                        vk_session.method('messages.send',
-                                          {'user_id': event.obj.from_id, 'random_id': 0, 'sticker_id': 58715})
-                        break
-                    # TODO: ^^^ УБРАТЬ ПРИ СОХРАНЕНИИ
+                    # # TODO: vvv Обработка сообщений во время тестирования УБРАТЬ ПРИ СОХРАНЕНИИ
+                    # if event.obj.from_id != 171254367:
+                    #     vk_session.method('messages.send',
+                    #                       {'user_id': event.obj.from_id,
+                    #                        'message': "Меня тут пока что улучшают, и я не могу отвечать."
+                    #                                   "\nПопробуй написать мне немного позднее", 'random_id': 0})
+                    #     vk_session.method('messages.send',
+                    #                       {'user_id': event.obj.from_id, 'random_id': 0, 'sticker_id': 58715})
+                    #     break
+                    # # TODO: ^^^ УБРАТЬ ПРИ СОХРАНЕНИИ
 
                     # Регистрация пользователей при первом запросе
                     if event.obj.from_id not in users:

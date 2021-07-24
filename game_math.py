@@ -49,13 +49,13 @@ def get_points(gamer):
 
 
 class GameMath:
-    texts = []
-    start_keyboard = []
-    end_keyboard = []
-    continue_game_keyboard = []
-    gamers_stats = {}
-    timers = {}
-    game_levels = {}
+    texts = None
+    game_levels = None
+    start_keyboard = None
+    end_keyboard = None
+    continue_game_keyboard = None
+    gamers_stats = {}  # TODO: data
+    timers = {}  # TODO: data
 
     def __init__(self):
         self.texts = [
@@ -121,7 +121,7 @@ class GameMath:
             ensure_ascii=False))
 
         # Инициализация gamers_active.json TODO: сюда можно пристроить self.end() для игравших во время стопа бота
-        with open("gamers_active.json", "r") as read_file:
+        with open("gamers_active.json", "r", encoding='utf-8') as read_file:
             if len(read_file.read()) != 0:
                 read_file.seek(0)
                 file = json.load(read_file)
@@ -133,7 +133,7 @@ class GameMath:
             write_file.close()
 
         # Инициализация self.gamers_stats
-        with open("gamers_active.json", "r") as read_file:
+        with open("gamers_active.json", "r", encoding='utf-8') as read_file:
             self.gamers_stats = json.load(read_file).get('stats')
             read_file.close()
 
@@ -165,14 +165,16 @@ class GameMath:
         self.save(user_id, True)
 
     def save(self, user_id, is_delete=False):
-        with open("gamers_active.json", "r") as read_file:
+        with open("gamers_active.json", "r", encoding='utf-8') as read_file:  # TODO: Сделать переменную top и вынести все в data.py
             file = json.load(read_file)
             read_file.close()
         with open("gamers_active.json", "w") as write_file:
             if file.get('top') is None or \
                     file.get('top').get(user_id) is None or \
-                    self.gamers_stats.get(user_id).get('score') > file.get('top').get(user_id):
-                file.get('top').update({user_id: self.gamers_stats.get(user_id).get('score')})
+                    self.gamers_stats.get(user_id).get('score') > file.get('top').get(user_id).get('record'):
+                user = vk_session.method('users.get', {'user_ids': int(user_id)})[0]
+                name = user.get('first_name') + ' ' + user.get('last_name')
+                file.get('top').update({user_id: {'name': name, 'record': self.gamers_stats.get(user_id).get('score')}})
             if is_delete:
                 self.gamers_stats.pop(user_id)
             json.dump({'stats': self.gamers_stats, 'top': file.get('top')}, write_file)
@@ -260,23 +262,23 @@ class GameMath:
 
     @staticmethod
     def get_top(arg=None):
-        with open("gamers_active.json", "r") as read_file:
+        with open("gamers_active.json", "r", encoding='utf-8') as read_file:
             top = json.load(read_file).get('top')
             read_file.close()
         top_sort = []
         for gamer in top:
-            top_sort.append([gamer, top.get(gamer)])
+            top_sort.append([top.get(gamer).get('name'), top.get(gamer).get('record')])
         top_sort.sort(key=get_points, reverse=True)
-        string_top = str()
 
+        string_top = str()
         num = 0
         for gamer in top_sort:
             num += 1
             # user = vk_session.method('users.get', {'user_ids': int(gamer[0])})[0]
             # name = user.get('first_name') + ' ' + user.get('last_name')
             # string_top += "{}. {}:\n Верных ответов: {}\n\n".format(num, name, gamer[1])
-            string_top += "{} место:\n Верных ответов: {}\n\n".format(num, gamer[1])
+            string_top += "{}. {}:\n Верных ответов: {}\n\n".format(num, gamer[0], gamer[1])
         # Минутка хвастовства
-        if top_sort[0][0] == "171254367":
+        if top_sort[0][0] == "Александр Березин":
             string_top += "О, мой хозяин на первом месте!&#128526;"
         return string_top
