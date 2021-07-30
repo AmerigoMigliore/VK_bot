@@ -5,7 +5,8 @@ from autoresponder import *
 
 def main():
     autoresponder = Autoresponder()
-    methods = {"GameMath.game": autoresponder.game_math_class.game}
+    methods = {"GameMath.game": autoresponder.game_math_class.game,
+               "GameMath.use_lives": autoresponder.game_math_class.use_live}
 
     with open("users_id.json", "r") as read_file:
         if len(read_file.read()) == 0:

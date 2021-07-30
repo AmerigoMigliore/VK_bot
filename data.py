@@ -26,7 +26,7 @@ with open("gamers_active.json", "r", encoding='utf-8') as read_file:
 
 def set_next_save_all():
     global timer
-    timer = threading.Timer(1800, save_all)
+    timer = threading.Timer(3600, save_all)
     timer.start()
 
 

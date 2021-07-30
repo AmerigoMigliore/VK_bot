@@ -60,7 +60,7 @@ class Autoresponder:
         self.user_id = user_id
 
         # Если пользователь НЕ играет, обработать его сообщение как запрос
-        if str(user_id) not in game_math_stats.keys():
+        if game_math_stats.get(str(user_id)) is None or not game_math_stats.get(str(user_id)).get("is_active"):
             keyboard = {
                 "one_time": False,
                 "buttons": [
