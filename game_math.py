@@ -160,23 +160,15 @@ class GameMath:
     def end(self, user_id):
         user_id = str(user_id)
 
+        game_math_stats.update({user_id: {'is_active': False, 'lives': game_math_stats.get(user_id).get('lives'),
+                                          'answer': None, 'score': game_math_stats.get(user_id).get('score')}})
+
         if game_math_stats.get(user_id).get('lives') == 0:
             # Обновление статуса активности, если нет жизней
-            game_math_stats.update({user_id: {'is_active': False, 'lives': game_math_stats.get(user_id).get('lives'),
-                                              'answer': None, 'score': 0}})
             keyboard = self.end_keyboard_without_lives
         else:
             # Обновление статуса активности, если есть жизни
-            game_math_stats.update({user_id: {'is_active': False, 'lives': game_math_stats.get(user_id).get('lives'),
-                                              'answer': None, 'score': game_math_stats.get(user_id).get('score')}})
             keyboard = self.end_keyboard_with_lives
-
-        vk_session.method('messages.send',
-                          {'user_id': int(user_id), 'message': "{}\nВы дали правильных ответов: {}\nВаш рекорд: {}\nУ Вас {}❤"
-                                                    .format(self.texts[2], game_math_stats.get(user_id).get('score'),
-                                                            game_math_top.get(user_id).get('record'),
-                                                            game_math_stats.get(user_id).get('lives')),
-                           'random_id': 0, 'keyboard': keyboard})
 
         # Обновление рейтинга, если надо
         if game_math_top == {} or \
@@ -185,6 +177,13 @@ class GameMath:
             user = vk_session.method('users.get', {'user_ids': int(user_id)})[0]
             name = user.get('first_name') + ' ' + user.get('last_name')
             game_math_top.update({user_id: {'name': name, 'record': game_math_stats.get(user_id).get('score')}})
+
+        vk_session.method('messages.send',
+                          {'user_id': int(user_id), 'message': "{}\nВы дали правильных ответов: {}\nВаш рекорд: {}\nУ Вас {}❤"
+                                                    .format(self.texts[2], game_math_stats.get(user_id).get('score'),
+                                                            game_math_top.get(user_id).get('record'),
+                                                            game_math_stats.get(user_id).get('lives')),
+                           'random_id': 0, 'keyboard': keyboard})
 
     def rules(self, user_id):
         vk_session.method('messages.send',
