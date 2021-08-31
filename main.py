@@ -4,6 +4,7 @@ from autoresponder import *
 
 
 def main():
+    is_bot_active = True
     autoresponder = Autoresponder()
     methods = {"GameMath.game": autoresponder.game_math_class.game,
                "GameMath.use_lives": autoresponder.game_math_class.use_live}
@@ -19,6 +20,29 @@ def main():
     while True:
         try:
             for event in longpoll.listen():
+                if event.obj.from_id == 171254367:
+                    if event.obj.text.lower() == "!выключить":
+                        is_bot_active = False
+                        vk_session.method('messages.send',
+                                          {'user_id': 171254367,
+                                           'message': "Бот выключен", 'random_id': 0})
+                        break
+                    elif event.obj.text.lower() == "!включить":
+                        is_bot_active = True
+                        vk_session.method('messages.send',
+                                          {'user_id': 171254367,
+                                           'message': "Бот включен", 'random_id': 0})
+                        break
+
+                if not is_bot_active:
+                    vk_session.method('messages.send',
+                                      {'user_id': event.obj.from_id,
+                                       'message': "Меня тут пока что улучшают, и я не могу отвечать."
+                                                  "\nПопробуй написать мне немного позднее", 'random_id': 0})
+                    vk_session.method('messages.send',
+                                      {'user_id': event.obj.from_id, 'random_id': 0, 'sticker_id': 58715})
+                    break
+
                 if event.type == VkBotEventType.MESSAGE_NEW and event.from_user:
 
                     # # TODO: vvv Обработка сообщений во время тестирования УБРАТЬ ПРИ СОХРАНЕНИИ
