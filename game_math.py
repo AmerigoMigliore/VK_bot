@@ -107,7 +107,8 @@ class GameMath:
             {
                 "inline": True,
                 "buttons": [
-                    [get_text_button('!Играть', 'primary'), get_text_button('!Рейтинг', 'secondary')]
+                    [get_text_button('!Играть', 'primary'), get_text_button('!Рейтинг', 'secondary')],
+                    [get_vkpay_button("Buy 5 lives", 1)]
                 ]
             },
             ensure_ascii=False))
