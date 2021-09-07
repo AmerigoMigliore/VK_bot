@@ -1,9 +1,9 @@
 import random
-from vk_auth import *
-from keyboard import *
-from data import game_math_stats, game_math_top
 import json
 import threading
+from vk_auth import vk_session, VkBotEventType
+from keyboard import *
+from data import game_math_stats, game_math_top, where_are_users
 
 
 def create_keyboard(nums):
@@ -59,7 +59,7 @@ class GameMath:
     timers = {}
 
     def __init__(self):
-        self.texts = [
+        self.texts = [  # TODO: Поменять на что-то нормальное
             # 0
             'Кто это тут у нас рискнул сыграть со мной в игру?',
             # 1
@@ -107,7 +107,7 @@ class GameMath:
             {
                 "inline": True,
                 "buttons": [
-                    [get_text_button('!Играть', 'primary'), get_text_button('!Рейтинг', 'secondary')],
+                    [get_text_button('!Математика', 'primary'), get_text_button('!Рейтинг математики', 'secondary')],
                     [get_vkpay_button("Buy 5 lives", 1)]
                 ]
             },
@@ -118,7 +118,7 @@ class GameMath:
                 "inline": True,
                 "buttons": [
                     [get_callback_button('Использовать ❤', 'positive', {"method": "GameMath.use_lives", "args": None})],
-                    [get_text_button('!Играть', 'primary'), get_text_button('!Рейтинг', 'secondary')]
+                    [get_text_button('!Математика', 'primary'), get_text_button('!Рейтинг математики', 'secondary')]
                 ]
             },
             ensure_ascii=False))
@@ -132,18 +132,34 @@ class GameMath:
             },
             ensure_ascii=False))
 
-    def handler(self, user_id, message):
-        user_id = str(user_id)
+    def process_event(self, event):
+        if event.type == VkBotEventType.MESSAGE_EVENT:
+            user_id = str(event.obj.user_id)
+            self.cancel_timer(user_id)
 
-        self.cancel_timer(user_id)
+            method = event.obj.payload.get('method')
+            if method == "GameMath.game":
+                self.game(user_id, event.obj.payload.get('args'))
+            elif method == "GameMath.use_lives":
+                self.use_live(user_id)
 
-        if message.lower() == 'правила':
-            self.rules(user_id)
-        elif message.lower() == 'начать' or message.lower() == 'продолжить' or \
-                message.isdigit() or (len(message) > 1 and message[1:].isdigit()):
-            self.game(user_id, message)
-        else:
-            self.end(user_id)
+            vk_session.method('messages.sendMessageEventAnswer',
+                              {'event_id': event.obj.event_id,
+                               'user_id': int(user_id),
+                               'peer_id': event.obj.peer_id})
+
+        elif event.type == VkBotEventType.MESSAGE_NEW:
+            user_id = str(event.obj.from_id)
+
+            message = event.obj.text.lower()
+
+            if message == 'правила':
+                self.rules(user_id)
+            elif message == 'начать' or message == 'продолжить':
+                self.cancel_timer(user_id)
+                self.game(user_id, message)
+            else:
+                self.end(user_id)
 
     def start(self, user_id):
         user_id = str(user_id)
@@ -185,6 +201,8 @@ class GameMath:
                                                             game_math_top.get(user_id).get('record'),
                                                             game_math_stats.get(user_id).get('lives')),
                            'random_id': 0, 'keyboard': keyboard})
+
+        where_are_users.update({user_id: "autoresponder"})
 
     def rules(self, user_id):
         vk_session.method('messages.send',
@@ -261,9 +279,8 @@ class GameMath:
         random.shuffle(nums)
 
         vk_session.method('messages.send',
-                          {'user_id': int(user_id), 'message': "Уровень " + str(level) +
-                                                               "\nСколько будет {} {} {}?"
-                                                    .format(formula[0], symbol, formula[1]),
+                          {'user_id': int(user_id), 'message': "Уровень {}\nСколько будет {} {} {}?"
+                                                    .format(str(level), formula[0], symbol, formula[1]),
                            'random_id': 0, 'keyboard': create_keyboard(nums)})
 
         game_math_stats.update(
@@ -280,7 +297,7 @@ class GameMath:
         if self.timers.get(user_id) is not None:
             self.timers.get(user_id).cancel()
 
-    def use_live(self, user_id, arg=None):
+    def use_live(self, user_id):
         user_id = str(user_id)
         if game_math_stats.get(user_id) is not None and \
                 not game_math_stats.get(user_id).get('is_active') and \
@@ -290,7 +307,7 @@ class GameMath:
             self.game(user_id, None)
 
     @staticmethod
-    def get_top(arg=None):
+    def get_top(user_id):
         top_sort = []
         for gamer in game_math_top.values():
             top_sort.append([gamer.get('name'), gamer.get('record')])
@@ -305,4 +322,6 @@ class GameMath:
         # Минутка хвастовства
         if top_sort[0][0] == "Александр Березин":
             string_top += "О, мой хозяин на первом месте!&#128526;"
-        return string_top
+
+        vk_session.method('messages.send',
+                          {'user_id': int(user_id), 'message': string_top, 'random_id': 0})

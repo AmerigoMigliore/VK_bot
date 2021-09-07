@@ -1,18 +1,4 @@
-from game_math import GameMath
-from vk_auth import *
-from keyboard import *
-from data import game_math_stats
-import threading
-import json
-import random
-
-
-def is_command(msg):
-    return msg[0] == '!'
-
-
-def is_correct_character(character):
-    return str.isalpha(character) or character == ' '
+from all_games import *
 
 
 class Autoresponder:
@@ -20,8 +6,6 @@ class Autoresponder:
     answers = {}
     commands = {}
     errors = {}
-    user_id = 0  # TODO: Нехорошо так хранить
-    game_math_class = GameMath()
 
     is_stickers_active = False
 
@@ -41,11 +25,10 @@ class Autoresponder:
                          '!все запросы': [self.getAllRequests, ""],
                          '!все команды': [self.getAllCommands, ""],
                          '!стикеры': [self.stickers, "\n1 - включить; 0 - выключить"],
-                         '!играть': [self.game_math_start, ""],
-                         '!рейтинг': [self.game_math_class.get_top, ""],
-                         '!таймер': [self.timer, "\nЧисло секунд"]
+                         '!математика': [self.game_math_start, ""],
+                         '!рейтинг математики': [self.get_top_math, ""]
                          }
-        self.errors = [
+        self.errors = [  # TODO: Поменять на что-то нормальное
             # 0
             'Я пока что не знаю этой фразы ;o\nВы можете обучить меня, введя команду !добавить'
             '\nУзнать все доступные запросы: !все запросы',
@@ -54,79 +37,83 @@ class Autoresponder:
             # 2
             'Неверные аргументы.\nУзнать список доступных команд и их синтаксис: !все команды',
             # 3
-            'Длина ответа не может быть меньше 2']
+            'Длина ответа не может быть меньше 2',
+            # 4
+            'Рейтинг доступен только при наличии активной игровой сессии.'
+            'Используйте команду \"!играть\" для запуска игровой сессии']
 
-    def respond(self, user_id, msg):
-        self.user_id = user_id
+    def process_event(self, event):
+        user_id = str(event.obj.from_id)
+        msg = event.obj.text
 
-        # Если пользователь НЕ играет, обработать его сообщение как запрос
-        if game_math_stats.get(str(user_id)) is None or not game_math_stats.get(str(user_id)).get("is_active"):
-            keyboard = {
-                "one_time": False,
-                "buttons": [
-                    [get_text_button('!Все запросы', 'primary'), get_text_button('!Все команды', 'primary')]
-                ]
-            }
-            keyboard = str(json.dumps(keyboard, ensure_ascii=False))
+        keyboard = {
+            "one_time": False,
+            "buttons": [
+                [get_text_button('!Все запросы', 'primary'), get_text_button('!Все команды', 'primary')]
+            ]
+        }
+        keyboard = str(json.dumps(keyboard, ensure_ascii=False))
 
-            if msg == "" or not is_command(msg):
-                # Удаление лишних небуквенных символов
-                msg = "".join(filter(is_correct_character, msg))
-                if msg != "":
-                    # Получение списка всех возможных ответов на данный запрос
-                    answer = self.answers.get(msg.lower())
-                    if answer is None:
-                        answer = self.errors[0]
-                    else:
-                        # Случайный выбор ответа из полученного списка
-                        answer = answer[random.randint(0, len(answer) - 1)]
-                else:
+        if msg == "" or not self.is_command(msg):
+
+            # Удаление лишних небуквенных символов
+            msg = "".join(filter(self.is_correct_character, msg))
+
+            if msg != "":
+                # Получение списка всех возможных ответов на данный запрос
+                answer = self.answers.get(msg.lower())
+                if answer is None:
                     answer = self.errors[0]
-
-                # Если ответ - стикер (формат: ##ID, где ID - id стикера)
-                if answer[0:2] == "##":
-                    vk_session.method('messages.send',
-                                      {'user_id': user_id, 'sticker_id': answer[2:], 'random_id': 0,
-                                       'keyboard': keyboard})
-                # Если ответ - не стикер
                 else:
-                    vk_session.method('messages.send',
-                                      {'user_id': user_id, 'message': answer, 'random_id': 0, 'keyboard': keyboard})
-
-                    # Выбор случайного стикера из диапазона id: 1..100, если включен ответ со случайными стикерами
-                    if self.is_stickers_active:
-                        flag = True
-                        while flag:
-                            rand = random.randint(1, 100)
-                            try:
-                                vk_session.method('messages.send',
-                                                  {'user_id': user_id, 'random_id': 0, 'keyboard': keyboard,
-                                                   'sticker_id': rand})
-                                flag = False
-                            except:
-                                print('Недоступно: ' + str(rand))
-                                flag = True
-            # Если полученное сообщение - команда (формат: !команда, где команда - текст команды)
+                    # Случайный выбор ответа из полученного списка
+                    answer = answer[random.randint(0, len(answer) - 1)]
             else:
-                message = self.readCommand(msg)
-                if message is None:
-                    return
-                vk_session.method('messages.send',
-                                  {'user_id': user_id, 'message': message, 'random_id': 0,
-                                   'keyboard': keyboard})
-        # Если пользователь играет - переадресовать сообщение методу GameMath.handler
-        else:
-            self.game_math_class.handler(user_id, msg)
+                answer = self.errors[0]
 
-    def readCommand(self, msg):
+            # Если ответ - стикер (формат: ##ID, где ID - id стикера)
+            if answer[0:2] == "##":
+                vk_session.method('messages.send',
+                                  {'user_id': int(user_id), 'sticker_id': answer[2:], 'random_id': 0,
+                                   'keyboard': keyboard})
+
+            # Если ответ - не стикер
+            else:
+                vk_session.method('messages.send',
+                                  {'user_id': int(user_id), 'message': answer, 'random_id': 0, 'keyboard': keyboard})
+
+                # Выбор случайного стикера из диапазона id: 1..100, если включен ответ со случайными стикерами
+                if self.is_stickers_active:
+                    flag = True
+                    while flag:
+                        rand = random.randint(1, 100)
+                        try:
+                            vk_session.method('messages.send',
+                                              {'user_id': int(user_id), 'random_id': 0, 'keyboard': keyboard,
+                                               'sticker_id': rand})
+                            flag = False
+                        except:
+                            print('Недоступно: ' + str(rand))
+                            flag = True
+
+        # Если полученное сообщение - команда (формат: !команда, где команда - текст команды)
+        else:
+            message = self.readCommand(msg, user_id)
+            if message is None:
+                return
+            else:
+                vk_session.method('messages.send',
+                                  {'user_id': int(user_id), 'message': message, 'random_id': 0,
+                                   'keyboard': keyboard})
+
+    def readCommand(self, msg, user_id):
         cmd = msg.split('\n')[0].strip().lower()
         arg = msg.replace(cmd, '', 1).strip()
         if cmd in self.commands:
-            return self.commands.get(cmd)[0](arg)
+            return self.commands.get(cmd)[0](arg, user_id)
         else:
             return self.errors[1]
 
-    def addResponse(self, arg):
+    def addResponse(self, arg, user_id=None):
         # Проверка на пустоту аргумента запроса и ответов
         if arg.count('\n') == 0:
             return self.errors[2]
@@ -135,7 +122,7 @@ class Autoresponder:
         split = arg.split('\n')
 
         # Извлечение запроса и удаление лишних небуквенных символов
-        request = "".join(filter(is_correct_character, split[0].strip().lower()))
+        request = "".join(filter(self.is_correct_character, split[0].strip().lower()))
 
         # Проверка запроса на корректность
         if len(request) == 0:
@@ -168,7 +155,7 @@ class Autoresponder:
         return "На запрос \"" + request.capitalize() + "\" добавлены ответы: " + string_added_responses + \
                "\n\n Проигнорированы ответы: " + string_invalid_responses
 
-    def deleteResponse(self, arg):
+    def deleteResponse(self, arg, user_id=None):
         if arg.count('\n') == 0:
             return self.errors[2]
 
@@ -199,7 +186,7 @@ class Autoresponder:
             json.dump(self.answers, write_file)
         return stringResponses
 
-    def deleteAllResponses(self, arg):
+    def deleteAllResponses(self, arg, user_id=None):
         if arg.count('\n') != 0:
             return self.errors[2]
 
@@ -215,7 +202,7 @@ class Autoresponder:
             json.dump(self.answers, write_file)
         return "Запрос \"" + request.capitalize() + "\" удален из словаря ответов"
 
-    def getAllRequests(self, arg=None):
+    def getAllRequests(self, arg=None, user_id=None):
         stringRequests = str()
         for request in self.answers.keys():
             stringRequests += request.capitalize() + '\n'
@@ -231,7 +218,7 @@ class Autoresponder:
 
         return stringRequests
 
-    def getAllCommands(self, arg=None):
+    def getAllCommands(self, arg=None, user_id=None):
         allCommands = str()
         number = 1
         for command in self.commands.items():
@@ -239,7 +226,7 @@ class Autoresponder:
             number += 1
         return allCommands
 
-    def stickers(self, arg):
+    def stickers(self, arg, user_id=None):
         if arg != '0' and arg != '1':
             return self.errors[2]
         self.is_stickers_active = int(arg)
@@ -247,40 +234,19 @@ class Autoresponder:
             return "Стикеры включены"
         return "Стикеры выключены"
 
-    def timer(self, arg, count=None, message=None):
-        if not arg.isdigit():
-            return self.errors[2]
+    @staticmethod
+    def get_top_math(arg=None, user_id=None):
+        game_math_class.get_top(user_id)
 
-        if count is None:
-            count = 0
-            message = vk_session.method('messages.send',
-                                        {'user_id': self.user_id, 'message': '\\', 'random_id': 0})
+    @staticmethod
+    def game_math_start(arg=None, user_id=None):
+        where_are_users.update({user_id: "game_math"})
+        game_math_class.start(str(user_id))
 
-        else:
-            if count >= int(arg):
-                vk_session.method('messages.send',
-                                  {'peer_id': self.user_id, 'message_id': message,
-                                   'message': 'Я подождал ' + str(int(arg)) + ' секунд!',
-                                   'random_id': 0})
-                vk_session.method('messages.delete',
-                                  {'peer_id': self.user_id, 'message_ids': message,
-                                   'delete_for_all': 1, 'random_id': 0})
+    @staticmethod
+    def is_command(msg):
+        return msg[0] == '!'
 
-                return
-            if count % 4 == 0:
-                vk_session.method('messages.edit',
-                                  {'peer_id': self.user_id, 'message_id': message, 'message': '\\', 'random_id': 0})
-            elif count % 4 == 1:
-                vk_session.method('messages.edit',
-                                  {'peer_id': self.user_id, 'message_id': message, 'message': '|', 'random_id': 0})
-            elif count % 4 == 2:
-                vk_session.method('messages.edit',
-                                  {'peer_id': self.user_id, 'message_id': message, 'message': '/', 'random_id': 0})
-            elif count % 4 == 3:
-                vk_session.method('messages.edit',
-                                  {'peer_id': self.user_id, 'message_id': message, 'message': '-', 'random_id': 0})
-        count += 1
-        threading.Timer(1, self.timer, args=[arg, count, message]).start()
-
-    def game_math_start(self, arg=None):
-        self.game_math_class.start(self.user_id)
+    @staticmethod
+    def is_correct_character(character):
+        return str.isalpha(character) or character == ' '

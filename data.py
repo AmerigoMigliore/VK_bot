@@ -1,10 +1,15 @@
 import json
 import threading
 
-"""ID всех, кто сейчас играет в GameMath"""
+# Классы, с которыми сейчас работают пользователи TODO: Сохранять в Json
+where_are_users = {}
+# Статистика всех, кто сейчас играет в GameMath
 game_math_stats = {}
+# Рейтинг в GameMath
 game_math_top = {}
-all_user_ids = list()
+# Все id пользователей, которые когда-либо использовали бота
+users = None
+# Таймер для сохранения всех данных в json
 timer: threading.Timer
 
 with open("gamers_active.json", "r", encoding='utf-8') as read_file:
@@ -38,7 +43,7 @@ with open("users_id.json", "r") as read_file:
 
 def set_next_save_all():
     global timer
-    timer = threading.Timer(3600, save_all)
+    timer = threading.Timer(3600 * 3, save_all)
     timer.start()
 
 

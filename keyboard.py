@@ -2,13 +2,13 @@ def get_text_button(text, color):
     return {
         "action": {
             "type": "text",
-            "label": f"{text}"
+            "label": text
         },
-        "color": f"{color}"
+        "color": color
     }
 
 
-def get_callback_button(text, color, payload=None):
+def get_callback_button(text, color, payload):
     if payload is None:
         payload = {}
     return {
