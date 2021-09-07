@@ -1,3 +1,5 @@
+# Created by ATB
+
 import sys
 from data import users, save_all
 from vk_auth import longpoll
