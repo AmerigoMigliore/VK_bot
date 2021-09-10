@@ -1,30 +1,19 @@
 from all_games import *
+from data import answers
 
 
 class Autoresponder:
-    """Класс ответов на сообщения пользователей"""
-    answers = {}
+    """ Класс ответов на сообщения пользователей """
     commands = {}
     errors = {}
 
-    is_stickers_active = False
-
     def __init__(self):
-        with open("answers.json", "r") as read_file:
-            if len(read_file.read()) == 0:
-                arg = "Привет\nПривет, мой друг!"
-                self.addResponse(arg)
-            else:
-                read_file.seek(0)
-                self.answers = json.load(read_file)
-            read_file.close()
-
-        self.commands = {'!добавить': [self.addResponse, "\nЗапрос\nОтвет\nОтвет\n..."],
-                         '!удалить запрос': [self.deleteAllResponses, "\nЗапрос"],
-                         '!удалить ответы': [self.deleteResponse, "\nЗапрос\nОтвет\nОтвет\n..."],
+        self.commands = {'!добавить': [self.addResponse, "Запрос\nОтвет\nОтвет\n..."],
+                         '!удалить ответы': [self.deleteResponse, "Запрос\nОтвет\nОтвет\n..."],
+                         '!удалить запрос': [self.deleteAllResponses, "Запрос"],
                          '!все запросы': [self.getAllRequests, ""],
+                         '!все ответы': [self.getAllResponses, "Запрос"],
                          '!все команды': [self.getAllCommands, ""],
-                         '!стикеры': [self.stickers, "\n1 - включить; 0 - выключить"],
                          '!математика': [self.game_math_start, ""],
                          '!рейтинг математики': [self.get_top_math, ""]
                          }
@@ -43,6 +32,22 @@ class Autoresponder:
             'Используйте команду \"!играть\" для запуска игровой сессии']
 
     def process_event(self, event):
+        """ Обработка сообщений от пользователя двух типов:
+        1. Сообщение-запрос.
+            - Формат сообщения: любой текст, не начинающийся с символа '!'.
+            - Действия при получении сообщения: нет.
+            - Ответ на сообщение: выбирается случайный ответ из словаря всех ответов, сформированного для каждого
+            пользователя отдельно. При первом формировании словаря, в него записывается стандартный набор ответов,
+            созданный администраторами бота.
+
+        2. Сообщение-команда.
+            - Формат сообщения: символ '!', тело команды, символ '/n', аргументы команды, разделенные символами '/n'.
+            - Действия при получении сообщения: передать сообщение в метод read_command.
+            - Ответ на сообщение: нет или пришедшая после обработки сообщения в read_command строка.
+
+        :param event: событие, пришедшее в VkBotLongPoll
+        :type event: :class:`Event`
+        """
         user_id = str(event.obj.from_id)
         msg = event.obj.text
 
@@ -54,15 +59,22 @@ class Autoresponder:
         }
         keyboard = str(json.dumps(keyboard, ensure_ascii=False))
 
+        # Проверка пользователя на наличие его ID в словаре.
+        # Если пользователя нет, добавить его и дать базовый набор запросов и ответов
+        # TODO: Сделать проверку при регистрации пользователя и только
+        if user_id not in answers.keys():
+            answers[user_id] = {}
+
         if msg == "" or not self.is_command(msg):
+            msg = msg.lower()
 
             # Удаление лишних небуквенных символов
             msg = "".join(filter(self.is_correct_character, msg))
 
             if msg != "":
                 # Получение списка всех возможных ответов на данный запрос
-                answer = self.answers.get(msg.lower())
-                if answer is None:
+                answer = answers.get("global").get(msg, []) + answers.get(user_id).get(msg, [])
+                if len(answer) == 0:
                     answer = self.errors[0]
                 else:
                     # Случайный выбор ответа из полученного списка
@@ -81,23 +93,11 @@ class Autoresponder:
                 vk_session.method('messages.send',
                                   {'user_id': int(user_id), 'message': answer, 'random_id': 0, 'keyboard': keyboard})
 
-                # Выбор случайного стикера из диапазона id: 1..100, если включен ответ со случайными стикерами
-                if self.is_stickers_active:
-                    flag = True
-                    while flag:
-                        rand = random.randint(1, 100)
-                        try:
-                            vk_session.method('messages.send',
-                                              {'user_id': int(user_id), 'random_id': 0, 'keyboard': keyboard,
-                                               'sticker_id': rand})
-                            flag = False
-                        except:
-                            print('Недоступно: ' + str(rand))
-                            flag = True
-
         # Если полученное сообщение - команда (формат: !команда, где команда - текст команды)
         else:
             message = self.readCommand(msg, user_id)
+
+            # Формирование ответа, пришедшего после выполнения команды
             if message is None:
                 return
             else:
@@ -106,6 +106,27 @@ class Autoresponder:
                                    'keyboard': keyboard})
 
     def readCommand(self, msg, user_id):
+        """ Обработка команд по шаблону:
+            - Первая строка: !команда.
+            - Последующие строки: аргумент(-ы) команды.
+
+        Примечания:
+            - Строки разделяются символом '\n'.
+            - Некоторые команды допускают несколько аргументов, разделенные символом '\n'.
+
+        Функции, обрабатывающие команду, должны принимать 2 аргумента:
+            - arg:     аргументы команды.
+            - user_id: ID пользователя, вызвавшего команду.
+
+            - При возникновении ошибки при чтении команды следует вернуть сообщение об ошибке в виде строки,
+            которая будет отправлена пользователю.
+
+        :param msg: сообщение с командой и аргументами по шаблону.
+        :type msg: str.
+
+        :param user_id: ID пользователя, вызвавшего команду.
+        :type user_id: int или str.
+        """
         cmd = msg.split('\n')[0].strip().lower()
         arg = msg.replace(cmd, '', 1).strip()
         if cmd in self.commands:
@@ -113,7 +134,24 @@ class Autoresponder:
         else:
             return self.errors[1]
 
-    def addResponse(self, arg, user_id=None):
+    def addResponse(self, arg, user_id):
+        """ Добавление нового запроса или новых ответов к уже существующему запросу для данного пользователя.
+
+        :param arg: сообщение от пользователя по шаблону:
+            - Первая строка: запрос.
+            - Последующие строки: ответ.
+
+            Примечания:
+                - Строки разделяются символом '\n'.
+                - На запрос можно добавить 1 и более ответов, разделенных между собой символом '\n'.
+        :type arg: str.
+
+        :param user_id: ID пользователя, вызвавшего команду.
+        :type user_id: int или str.
+
+        :return: сообщение об ошибке или сообщение об ответах, которые добавлены и недобавлены на данный запрос.
+        """
+        user_id = str(user_id)
         # Проверка на пустоту аргумента запроса и ответов
         if arg.count('\n') == 0:
             return self.errors[2]
@@ -128,118 +166,229 @@ class Autoresponder:
         if len(request) == 0:
             return self.errors[2]
 
-        responses = list()
-        string_added_responses = str()
-        string_invalid_responses = str()
+        # Получение уже имеющихся ответов по данному запросу из словаря для данного пользователя
+        all_responses = answers.get(user_id).get(request, [])
 
-        # Проход по всем ответам и их запись в словарь ответов и строку для ответа пользователю
-        for i in range(1, len(split)):
-            if len(split[i].strip()) < 2 or \
-                    (self.answers.get(request) is not None and split[i].strip() in self.answers.get(request)):
-                string_invalid_responses += '\n\"' + split[i].strip() + '\"'
+        return_added_responses = str()
+        return_invalid_responses = str()
+
+        # Проход по всем ответам и их запись в список ответов на данный запрос и строку для ответа пользователю
+        for response in split[1:]:
+            response.split()
+            if response in answers.get(user_id).get(request, []) or \
+                    (response[0:2] == "##" and not response[2:].isalpha()):
+                return_invalid_responses += "\n\"{}\"".format(response)
             else:
-                responses.append(split[i].strip())
-                string_added_responses += '\n\"' + split[i].strip() + '\"'
+                all_responses.append(response)
+                return_added_responses += "\n\"{}\"".format(response)
 
-        # Получение уже имеющихся ответов по данному запросу и добавление новых ответов
-        allResponses = self.answers.get(request)
-        if allResponses is None:
-            allResponses = list()
-        allResponses.extend(responses)
-        self.answers.update({request: allResponses})
+        # Обновление списка ответов на данный запрос для данного пользователя
+        answers[user_id][request] = all_responses
 
-        # Сохранение нового словаря в answers.json
-        with open("answers.json", "w") as write_file:
-            json.dump(self.answers, write_file)
-            write_file.close()
-        return "На запрос \"" + request.capitalize() + "\" добавлены ответы: " + string_added_responses + \
-               "\n\n Проигнорированы ответы: " + string_invalid_responses
+        # Возврат сообщения о завершении добавления ответов
+        return "На запрос \"{}\" добавлены ответы: {}\n\n Проигнорированы ответы: {}"\
+            .format(request.capitalize(), return_added_responses, return_invalid_responses)
 
-    def deleteResponse(self, arg, user_id=None):
+    def deleteResponse(self, arg, user_id):
+        """ Выборочное удаление ответов на запрос для данного пользователя.
+
+        :param arg: сообщение от пользователя по шаблону:
+            - Первая строка: запрос.
+            - Последующие строки: ответ.
+
+            Примечания:
+                - Строки разделяются символом '\n'.
+                - У запроса можно удалить 1 и более ответов, разделенных между собой символом '\n'.
+        :type arg: str.
+
+        :param user_id: ID пользователя, вызвавшего команду.
+        :type user_id: int или str.
+
+        :return: сообщение об ошибке или сообщение об ответах, которые удалены и неудалены для данного запроса.
+        """
+        user_id = str(user_id)
+
+        # Проверка аргумента на пустоту
         if arg.count('\n') == 0:
             return self.errors[2]
 
+        # Разделение аргумента по строкам. Первая строка - запрос; последующие - ответы
         split = arg.split('\n')
-        request = split[0].strip().lower()
+
+        # Извлечение запроса и удаление лишних небуквенных символов
+        request = "".join(filter(self.is_correct_character, split[0].strip().lower()))
+
+        # Проверка запроса на корректность
         if len(request) == 0:
             return self.errors[2]
 
-        if request not in self.answers:
-            return "Запрос \"" + request.capitalize() + "\" не найден в словаре ответов"
+        # Проверка запроса на существование в словаре ответов для данного пользователя
+        if request not in answers.get(user_id):
+            return "Запрос \"{}\" не найден в Вашем словаре ответов".format(request.capitalize())
 
-        allResponses = self.answers.get(request)
-        stringResponses = str()
-        for i in range(1, len(split)):
-            if split[i].strip() not in allResponses:
-                stringResponses += "Для запроса \"" + request + "\" не найден ответ \"" + split[i].strip() + "\"\n"
+        # Получение уже имеющихся ответов по данному запросу из словаря для данного пользователя
+        all_responses = answers.get(user_id).get(request, [])
+        return_deleted_responses = str()
+        return_invalid_responses = str()
+        is_deleted_all = False
+
+        for response in split[1:]:
+            response.strip()
+            if response not in all_responses:
+                return_invalid_responses += "\n\"{}\"".format(response)
             else:
-                allResponses.remove(split[i].strip())
-                stringResponses += "Ответ \"" + split[i].strip() + "\" для запроса \"" + request + "\" успешно удален\n"
+                all_responses.remove(response)
+                return_deleted_responses += "\n\"{}\"".format(response)
 
-        if len(allResponses) == 0:
-            self.answers.pop(request)
-            stringResponses += "Запрос \"" + request.capitalize() + "\" удален из словаря ответов"
+        # Проверка запроса на наличие ответов и удаление необходимых ответов из словаря для данного пользователя
+        if len(all_responses) == 0:
+            answers.get(user_id).pop(request)
+            is_deleted_all = True
         else:
-            self.answers.update({request: allResponses})
+            answers[user_id][request] = all_responses
 
-        with open("answers.json", "w") as write_file:
-            json.dump(self.answers, write_file)
-        return stringResponses
+        # Возврат сообщения о завершении удаления ответов
+        if is_deleted_all:
+            return "Запрос \"{}\" полностью удален из Вашего словаря ответов".format(request.capitalize())
+        else:
+            return "На запрос \"{}\" удалены ответы: {}\n\n Проигнорированы ответы: {}"\
+                .format(request.capitalize(), return_deleted_responses, return_invalid_responses)
 
-    def deleteAllResponses(self, arg, user_id=None):
-        if arg.count('\n') != 0:
-            return self.errors[2]
+    def deleteAllResponses(self, arg, user_id):
+        """ Удаление всего запроса для данного пользователя.
 
-        request = arg.strip().lower()
+        :param arg: сообщение от пользователя по шаблону:
+            - Первая строка: запрос.
+        :type arg: str.
+
+        :param user_id: ID пользователя, вызвавшего команду.
+        :type user_id: int или str.
+
+        :return: сообщение об ошибке или сообщение об удалении данного запроса.
+        """
+        user_id = str(user_id)
+
+        # Извлечение запроса и удаление лишних небуквенных символов
+        request = "".join(filter(self.is_correct_character, arg.strip().lower()))
+
+        # Проверка запроса на корректность
         if len(request) == 0:
             return self.errors[2]
 
-        if request not in self.answers:
-            return "Запрос \"" + request.capitalize() + "\" не найден в словаре ответов"
+        # Проверка запроса на существование в словаре ответов для данного пользователя
+        if request not in answers.get(user_id):
+            return "Запрос \"{}\" не найден в Вашем словаре ответов".format(request.capitalize())
 
-        self.answers.pop(request)
-        with open("answers.json", "w") as write_file:
-            json.dump(self.answers, write_file)
-        return "Запрос \"" + request.capitalize() + "\" удален из словаря ответов"
+        # Удаление всего запроса из словаря ответов для данного пользователя
+        answers.get(user_id).pop(request)
 
-    def getAllRequests(self, arg=None, user_id=None):
-        stringRequests = str()
-        for request in self.answers.keys():
-            stringRequests += request.capitalize() + '\n'
-
-            # Показ всех ответов на запросы
-            if arg == "admin":
-                allResponses = self.answers.get(request)
-                for response in allResponses:
-                    if response[0:2] == "##":
-                        response = "Стикер №" + response[2:]
-                    stringRequests += "-" + response + "\n"
-                stringRequests += "\n"
-
-        return stringRequests
-
-    def getAllCommands(self, arg=None, user_id=None):
-        allCommands = str()
-        number = 1
-        for command in self.commands.items():
-            allCommands += str(number) + ". " + command[0].capitalize() + command[1][1] + "\n\n"
-            number += 1
-        return allCommands
-
-    def stickers(self, arg, user_id=None):
-        if arg != '0' and arg != '1':
-            return self.errors[2]
-        self.is_stickers_active = int(arg)
-        if int(arg):
-            return "Стикеры включены"
-        return "Стикеры выключены"
+        # Возврат сообщения о завершении удаления ответов
+        return "Запрос \"{}\" полностью удален из Вашего словаря ответов".format(request.capitalize())
 
     @staticmethod
-    def get_top_math(arg=None, user_id=None):
+    def getAllRequests(arg, user_id):
+        """ Предоставление списка всех доступных запросов.
+
+        :param arg: None.
+        :type arg: None.
+
+        :param user_id: ID пользователя, вызвавшего команду.
+        :type user_id: int или str.
+
+        :return: сообщение со списком всех доступных запросов.
+        """
+        string_requests = str()
+
+        # Получение всех глобальных запросов и их запись в сообщение для ответа
+        string_requests += "Глобальные запросы:\n"
+        for request in answers.get("global").keys():
+            string_requests += "\n{}".format(request.capitalize())
+
+        # Получение всех локальных запросов и их запись в сообщение для ответа
+        string_requests += "\n\nВаши запросы:\n"
+        for request in answers.get(user_id).keys():
+            string_requests += "\n{}".format(request.capitalize())
+
+        # Возврат сообщения со списком всех доступных запросов
+        return string_requests
+
+    def getAllResponses(self, arg, user_id):
+        """ Предоставление списка всех доступных ответов на данный запрос для данного пользователя.
+
+        :param arg: запрос.
+        :type arg: str.
+
+        :param user_id: ID пользователя, вызвавшего команду.
+        :type user_id: int или str.
+
+        :return: сообщение со списком всех доступных ответов на данный запрос.
+        """
+        string_responses = str()
+
+        # Извлечение запроса и удаление лишних небуквенных символов
+        request = "".join(filter(self.is_correct_character, arg.strip().lower()))
+
+        # Проверка запроса на корректность
+        if len(request) == 0:
+            return self.errors[2]
+
+        # Проверка запроса на существование в словаре ответов для данного пользователя
+        if request not in answers.get(user_id):
+            return "Запрос \"{}\" не найден в Вашем словаре ответов".format(request.capitalize())
+
+        # Получение всех ответов на данный запрос для данного пользователя и их запись в сообщение для ответа
+        all_responses = answers.get(user_id).get(request)
+        for response in all_responses:
+            if response[0:2] == "##":
+                response = "Стикер №{}".format(response[2:])
+            string_responses += "\n{}".format(response)
+
+        # Возврат сообщения со списком всех доступных запросов
+        return "Ответы на запрос \"{}\":\n{}".format(request.capitalize(), string_responses)
+
+    def getAllCommands(self, arg=None, user_id=None):
+        """ Предоставление списка всех доступных команд бота.
+
+        :param arg: None.
+        :type arg: None.
+
+        :param user_id: None.
+        :type user_id: None.
+
+        :return: сообщение со списком всех доступных команд бота.
+        """
+        string_commands = str()
+        number = 1
+
+        # Получение всех команд и их запись в сообщение для ответа
+        for command in self.commands.items():
+            string_commands += "\n{}. {}\n{}\n\n".format(number, command[0].capitalize(), command[1][1])
+            number += 1
+
+        return "Команды:\n{}".format(string_commands)
+
+    @staticmethod
+    def get_top_math(arg, user_id):
+        """ Предоставление списка рейтинга игры "Математика".
+
+        :param arg: None.
+        :type arg: None.
+
+        :param user_id: ID пользователя, вызвавшего команду.
+        :type user_id: int или str.
+        """
         game_math_class.get_top(user_id)
 
     @staticmethod
-    def game_math_start(arg=None, user_id=None):
+    def game_math_start(arg, user_id):
+        """ Начало игры "Математика".
+
+        :param arg: None.
+        :type arg: None.
+
+        :param user_id: ID пользователя, вызвавшего команду.
+        :type user_id: int или str.
+        """
         where_are_users.update({user_id: "game_math"})
         game_math_class.start(str(user_id))
 

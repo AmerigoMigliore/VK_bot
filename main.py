@@ -1,3 +1,5 @@
+# >Created by ATB<
+
 import sys
 from data import users, save_all
 from vk_auth import longpoll
@@ -66,7 +68,7 @@ def main():
                         if str(user_id) not in where_are_users.keys():
                             where_are_users.update({str(user_id): "autoresponder"})
                         all_classes.get(where_are_users.get(str(user_id))).process_event(event)
-                    except Exception:
+                    except Exception as exc:
                         vk_session.method('messages.send',
                                           {'user_id': user_id, 'message':
                                               "Ой, кажется, у меня что-то сломалось ;o\n"
@@ -77,11 +79,13 @@ def main():
 
                         exc_type, exc_value = sys.exc_info()[:2]
                         vk_session.method('messages.send',
-                                          {'user_id': 171254367, 'message': "FROM:\n" + user_id +
+                                          {'user_id': 171254367, 'message': "FROM:\n" + str(user_id) +
                                                                             "\nERROR:\n"
                                                                             f'{exc_type.__name__} => {exc_value} in '
                                                                             f'{threading.current_thread().name}',
                                            'random_id': 0})
+
+                        print("Exception: ", exc)
 
                 if event.type == VkBotEventType.MESSAGE_EVENT:
                     all_classes.get(where_are_users.get(str(event.obj.user_id))).process_event(event)
