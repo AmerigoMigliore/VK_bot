@@ -4,6 +4,7 @@ import threading
 # Все id пользователей, которые когда-либо использовали бота
 users = None
 # Классы, с которыми сейчас работают пользователи TODO: Сохранять в Json
+# TODO: В файл с users добавить where_are_users и user_roles
 where_are_users = {}
 
 # Все ответы на запросы пользователей
