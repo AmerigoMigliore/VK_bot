@@ -428,6 +428,7 @@ class Autoresponder:
             vk_session.method('messages.send',
                               {'user_id': int(user_id), 'message': "Вы завершили работу с генератором случайных чисел",
                                'random_id': 0, 'keyboard': self.keyboard})
+            return
 
         # Случайное вещественное число от 0 до 1
         elif arg == 'random':
