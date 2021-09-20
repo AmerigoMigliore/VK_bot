@@ -216,7 +216,7 @@ class GameMath:
                                'random_id': 0, 'keyboard': self.end_keyboard_without_lives})
 
             game_math_stats[user_id]['score'] = 0
-            where_are_users.update({user_id: "autoresponder"})
+            where_are_users.update({user_id: {'class': 'autoresponder'}})
 
         # Обновление значений
         game_math_stats[user_id]['is_active'] = False

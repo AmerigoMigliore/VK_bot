@@ -416,7 +416,7 @@ class Autoresponder:
         :param user_id: ID пользователя, вызвавшего команду.
         :type user_id: int или str.
         """
-        where_are_users.update({user_id: "game_math"})
+        where_are_users.update({user_id: {'class': 'game_math'}})
         game_math_class.start(str(user_id))
 
     def choose_random(self, arg, user_id, message=None):

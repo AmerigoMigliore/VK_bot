@@ -124,7 +124,7 @@ try:
     main()
 except KeyboardInterrupt:
     raise
-finally:
-    save_all(True)
-    print("\033[1m\033[32m\033[40mBye!\033[0m")
-    sys.exit()
+# finally:
+#     save_all(True)
+#     print("\033[1m\033[32m\033[40mBye!\033[0m")
+#     sys.exit()
