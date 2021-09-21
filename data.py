@@ -1,5 +1,6 @@
 import json
 import threading
+import sqlite3
 
 # Все id пользователей, которые когда-либо использовали бота
 users = None
@@ -9,6 +10,9 @@ where_are_users = {}
 
 # Все ответы на запросы пользователей
 answers = {}
+# Таблица синонимов
+synonyms_con = None
+synonyms_cur = None
 
 # Статистика всех, кто сейчас играет в GameMath
 game_math_stats = {}
@@ -44,6 +48,12 @@ with open("gamers_active.json", "r", encoding='utf-8') as read_file:
         read_file.seek(0)
         game_math_top = dict(json.load(read_file).get('top', {}))
     read_file.close()
+
+# Настройка базы данных синонимов для ответов
+synonyms_con = sqlite3.connect('answers.db')
+synonyms_cur = synonyms_con.cursor()
+synonyms_cur.execute('CREATE TABLE IF NOT EXISTS synonyms_global(word text PRIMARY KEY, request text);')
+synonyms_con.commit()
 
 
 def set_next_save_all():

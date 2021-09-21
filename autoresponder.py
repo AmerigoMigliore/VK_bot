@@ -1,5 +1,5 @@
 from all_games import *
-from data import answers
+from data import answers, synonyms_cur, synonyms_con
 
 
 class Autoresponder:
@@ -19,7 +19,10 @@ class Autoresponder:
                          '!рандом': [self.choose_random,
                                      "A B, если выбрать целое случайное число от A до B\nНичего, если хотите выбрать тип"],
                          '!математика': [self.game_math_start, ""],
-                         '!рейтинг математики': [self.get_top_math, ""]
+                         '!рейтинг математики': [self.get_top_math, ""],
+                         '!!добавить синонимы': [self.add_synonyms, "Запрос\nСиноним\nСиноним\n..."],
+                         '!!удалить синонимы': [self.delete_synonyms, "Синоним\nСиноним\n..."],
+                         '!!синонимы': [self.get_synonyms, "Запрос"]
                          }
         self.methods = {'': self.choose_random}
         self.errors = [  # TODO: Поменять на что-то нормальное
@@ -80,7 +83,6 @@ class Autoresponder:
 
             # Проверка пользователя на наличие его ID в словаре.
             # Если пользователя нет, добавить его и дать базовый набор запросов и ответов
-            # TODO: Сделать проверку при регистрации пользователя и только
             if user_id not in answers.keys():
                 answers[user_id] = {}
 
@@ -92,14 +94,18 @@ class Autoresponder:
 
             else:
                 if message == "" or not self.is_command(message):
-                    message = message.lower()
 
                     # Удаление лишних небуквенных символов
-                    message = "".join(filter(self.is_correct_character, message))
+                    message = "".join(filter(self.is_correct_character, message.lower().strip()))
 
                     if message != "":
                         # Получение списка всех возможных ответов на данный запрос
-                        answer = answers.get("global").get(message, []) + answers.get(user_id).get(message, [])
+                        synonyms_cur.execute(f'SELECT request FROM synonyms_global WHERE word="{message}";')
+                        request = synonyms_cur.fetchone()
+
+                        answer = answers.get("global").get(request[0] if request is not None else None, []) + \
+                            answers.get("global").get(message, []) + \
+                            answers.get(user_id).get(message, [])
                         if len(answer) == 0:
                             answer = self.errors[0]
                         else:
@@ -204,10 +210,10 @@ class Autoresponder:
             response.split()
             if response in answers.get(user_id).get(request, []) or \
                     (response[0:2] == "##" and not response[2:].isalpha()):
-                return_invalid_responses += "\n\"{}\"".format(response)
+                return_invalid_responses += f"\n\"{response}\""
             else:
                 all_responses.append(response)
-                return_added_responses += "\n\"{}\"".format(response)
+                return_added_responses += f"\n\"{response}\""
 
         # Обновление списка ответов на данный запрос для данного пользователя
         answers[user_id][request] = all_responses
@@ -312,6 +318,68 @@ class Autoresponder:
         # Возврат сообщения о завершении удаления ответов
         return "Запрос \"{}\" полностью удален из Вашего словаря ответов".format(request.capitalize())
 
+    def add_synonyms(self, arg, user_id):
+        # TODO: Брать из списка администраторов
+        if str(user_id) != "171254367":
+            return "Недостаточный уровень доступа"
+        else:
+            split = arg.split('\n')
+            if len(split) < 2:
+                return self.errors[2]
+            else:
+                synonyms_cur.executemany('INSERT OR IGNORE INTO synonyms_global VALUES(?, ?);', ((word.lower().strip(), split[0].lower().strip()) for word in split[1:]))
+                synonyms_con.commit()
+                n = '\n'
+                return f'К запросу "{split[0].capitalize().strip()}" добавлены синонимы:\n' \
+                       f'{n.join([word.capitalize().strip() for word in split[1:]])}'
+
+    def get_synonyms(self, arg, user_id):
+        # TODO: Брать из списка администраторов
+        if str(user_id) != "171254367":
+            return "Недостаточный уровень доступа"
+        else:
+            split = arg.split('\n')
+            if len(split) != 1:
+                return self.errors[2]
+            else:
+                synonyms_cur.execute(f'SELECT word FROM synonyms_global WHERE request="{split[0].lower().strip()}"')
+                synonyms = synonyms_cur.fetchall()
+                if len(synonyms) == 0:
+                    return f'Запрос "{split[0].capitalize()}" не имеет синонимов'
+                else:
+                    n = '\n'
+                    return f'Запрос "{split[0].capitalize()}" имеет синонимы:\n' \
+                           f'{n.join((word[0].capitalize() for word in synonyms))}'
+
+    def delete_synonyms(self, arg, user_id):
+        # TODO: Брать из списка администраторов
+        if str(user_id) != "171254367":
+            return "Недостаточный уровень доступа"
+        else:
+            split = arg.split('\n')
+            if len(split) < 2:
+                return self.errors[2]
+            else:
+                synonyms_cur.execute(f'SELECT word FROM synonyms_global WHERE request="{split[0].lower().strip()}"')
+                synonyms = synonyms_cur.fetchall()
+                if len(synonyms) == 0:
+                    return f'Запрос "{split[0].capitalize()}" не имеет синонимов для удаления'
+                else:
+                    synonyms = [word[0].lower() for word in synonyms]
+                    return_deleted_synonyms = str()
+                    return_invalid_synonyms = str()
+                    for word in split[1:]:
+                        if word.lower().strip() in synonyms:
+                            synonyms_cur.execute(f'DELETE FROM synonyms_global WHERE word="{word.lower().strip()}";')
+                            return_deleted_synonyms += f"\n\"{word.capitalize()}\""
+                        else:
+                            return_invalid_synonyms += f"\n\"{word.capitalize()}\""
+                    synonyms_con.commit()
+
+                    return f'У запроса "{split[0].capitalize().strip()}" ' \
+                           f'удалены синонимы:\n{return_deleted_synonyms}\n\n' \
+                           f'Проигнорированы синонимы:\n{return_invalid_synonyms}'
+
     @staticmethod
     def get_all_requests(arg, user_id):
         """ Предоставление списка всех доступных запросов.
@@ -393,31 +461,6 @@ class Autoresponder:
             number += 1
 
         return "Команды:\n{}".format(string_commands)
-
-    @staticmethod
-    def get_top_math(arg, user_id):
-        """ Предоставление списка рейтинга игры "Математика".
-
-        :param arg: None.
-        :type arg: None.
-
-        :param user_id: ID пользователя, вызвавшего команду.
-        :type user_id: int или str.
-        """
-        game_math_class.get_top(user_id)
-
-    @staticmethod
-    def game_math_start(arg, user_id):
-        """ Начало игры "Математика".
-
-        :param arg: None.
-        :type arg: None.
-
-        :param user_id: ID пользователя, вызвавшего команду.
-        :type user_id: int или str.
-        """
-        where_are_users.update({user_id: {'class': 'game_math'}})
-        game_math_class.start(str(user_id))
 
     def choose_random(self, arg, user_id, message=None):
         answer = str()
@@ -591,6 +634,31 @@ class Autoresponder:
 
         vk_session.method('messages.send',
                           {'user_id': int(user_id), 'message': answer, 'random_id': 0})
+
+    @staticmethod
+    def get_top_math(arg, user_id):
+        """ Предоставление списка рейтинга игры "Математика".
+
+        :param arg: None.
+        :type arg: None.
+
+        :param user_id: ID пользователя, вызвавшего команду.
+        :type user_id: int или str.
+        """
+        game_math_class.get_top(user_id)
+
+    @staticmethod
+    def game_math_start(arg, user_id):
+        """ Начало игры "Математика".
+
+        :param arg: None.
+        :type arg: None.
+
+        :param user_id: ID пользователя, вызвавшего команду.
+        :type user_id: int или str.
+        """
+        where_are_users.update({user_id: {'class': 'game_math'}})
+        game_math_class.start(str(user_id))
 
     @staticmethod
     def is_command(msg):
