@@ -469,6 +469,7 @@ class Autoresponder:
 
         # Случайное вещественное число от 0 до 1
         elif arg == 'random':
+            where_are_users[user_id]['args'] = None
             answer = f"Ваше случайное число: {random.random()}"
 
         # Случайное целое число от A до B
