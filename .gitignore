@@ -1,5 +1,6 @@
 no_git*
 *.json
+*.db
 сохранения
 
 # Byte-compiled / optimized / DLL files
