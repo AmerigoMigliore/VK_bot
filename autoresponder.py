@@ -1,5 +1,8 @@
 from all_games import *
 from data import answers, synonyms_cur, synonyms_con
+import numpy as np
+from pyxdameraulevenshtein import normalized_damerau_levenshtein_distance_seqs
+from transliterate import translit
 
 
 class Autoresponder:
@@ -17,7 +20,7 @@ class Autoresponder:
                          '!все ответы': [self.get_all_responses, "Запрос"],
                          '!все команды': [self.get_all_commands, ""],
                          '!рандом': [self.choose_random, ""],
-                         '!математика': [self.game_math_start, ""],
+                         '!игра': [self.game_math_start, ""],
                          '!рейтинг математики': [self.get_top_math, ""],
                          '!!добавить синонимы': [self.add_synonyms, "[Только для администраторов]\nЗапрос\nСиноним\nСиноним\n..."],
                          '!!удалить синонимы': [self.delete_synonyms, "[Только для администраторов]\nСиноним\nСиноним\n..."],
@@ -92,21 +95,28 @@ class Autoresponder:
                     # Удаление лишних небуквенных символов
                     message = "".join(filter(self.is_correct_character, message.lower().strip()))
 
-                    if message != "":
-                        # Получение списка всех возможных ответов на данный запрос
-                        synonyms_cur.execute(f'SELECT request FROM synonyms_global WHERE word="{message}";')
+                    if message == "":
+                        answer = self.errors[0]
+                    else:
+                        # Получение всех доступных синонимов
+                        synonyms_cur.execute(f'SELECT word FROM synonyms_global')
+                        all_synonyms = synonyms_cur.fetchall()
+                        all_synonyms = [x[0] for x in all_synonyms] if len(all_synonyms) > 0 else list(answers.get('global').keys())
+
+                        # Получение слова-синонима для данного запроса (если есть)
+                        synonyms_cur.execute(f'SELECT request FROM synonyms_global WHERE word="{self.fix_command(message, all_synonyms)}";')
                         request = synonyms_cur.fetchone()
 
+                        # Получение списка всех возможных ответов на данный запрос
                         answer = answers.get("global").get(request[0] if request is not None else None, []) + \
                             answers.get("global").get(message, []) + \
                             answers.get(user_id).get(message, [])
-                        if len(answer) == 0:
-                            answer = self.errors[0]
-                        else:
+                        if len(answer) != 0:
                             # Случайный выбор ответа из полученного списка
                             answer = answer[random.randint(0, len(answer) - 1)]
-                    else:
-                        answer = self.errors[0]
+                        else:
+                            answer = self.errors[0]
+
 
                     # Если ответ - стикер (формат: ##ID, где ID - id стикера)
                     if answer[0:2] == "##":
@@ -318,13 +328,16 @@ class Autoresponder:
             return "Недостаточный уровень доступа"
         else:
             split = arg.split('\n')
+            request = split[0].lower().strip()
+            if request not in answers.get('global').keys():
+                return f'Запрос {request} не найден в словаре ответов.'
             if len(split) < 2:
                 return self.errors[2]
             else:
-                synonyms_cur.executemany('INSERT OR IGNORE INTO synonyms_global VALUES(?, ?);', ((word.lower().strip(), split[0].lower().strip()) for word in split[1:]))
+                synonyms_cur.executemany('INSERT OR IGNORE INTO synonyms_global VALUES(?, ?);', ((word.lower().strip(), request) for word in split[1:]))
                 synonyms_con.commit()
                 n = '\n'
-                return f'К запросу "{split[0].capitalize().strip()}" добавлены синонимы:\n' \
+                return f'К запросу "{request}" добавлены синонимы:\n' \
                        f'{n.join([word.capitalize().strip() for word in split[1:]])}'
 
     def get_synonyms(self, arg, user_id):
@@ -351,26 +364,27 @@ class Autoresponder:
             return "Недостаточный уровень доступа"
         else:
             split = arg.split('\n')
+            request = split[0].lower().strip()
             if len(split) < 2:
                 return self.errors[2]
             else:
-                synonyms_cur.execute(f'SELECT word FROM synonyms_global WHERE request="{split[0].lower().strip()}"')
+                synonyms_cur.execute(f'SELECT word FROM synonyms_global WHERE request="{request}"')
                 synonyms = synonyms_cur.fetchall()
                 if len(synonyms) == 0:
-                    return f'Запрос "{split[0].capitalize()}" не имеет синонимов для удаления'
+                    return f'Запрос "{request.capitalize()}" не имеет синонимов для удаления'
                 else:
                     synonyms = [word[0].lower() for word in synonyms]
                     return_deleted_synonyms = str()
                     return_invalid_synonyms = str()
                     for word in split[1:]:
-                        if word.lower().strip() in synonyms:
+                        if word.lower().strip() in synonyms and word.lower().strip() != request:
                             synonyms_cur.execute(f'DELETE FROM synonyms_global WHERE word="{word.lower().strip()}";')
                             return_deleted_synonyms += f"\n\"{word.capitalize()}\""
                         else:
                             return_invalid_synonyms += f"\n\"{word.capitalize()}\""
                     synonyms_con.commit()
 
-                    return f'У запроса "{split[0].capitalize().strip()}" ' \
+                    return f'У запроса "{request}" ' \
                            f'удалены синонимы:\n{return_deleted_synonyms}\n\n' \
                            f'Проигнорированы синонимы:\n{return_invalid_synonyms}'
 
@@ -679,3 +693,38 @@ class Autoresponder:
             return True
         except ValueError:
             return False
+
+    @staticmethod
+    def fix_command(text, words):
+        # Оригинальный текст
+        text_original = text.lower()
+        # Текст после транслитерации
+        text_transliteration = translit(text, 'ru')
+        # Текст после преобразования раскладки клавиатуры
+        text_qwerty = translit(text, language_code='qwerty')
+
+        array = np.array(words)
+        command_original, rate_original = \
+            min(list(zip(words, list(normalized_damerau_levenshtein_distance_seqs(text_original, array)))), key=lambda x: x[1])
+        command_transliteration, rate_transliteration = \
+            min(list(zip(words, list(normalized_damerau_levenshtein_distance_seqs(text_transliteration, array)))), key=lambda x: x[1])
+        command_qwerty, rate_qwerty = \
+            min(list(zip(words, list(normalized_damerau_levenshtein_distance_seqs(text_qwerty, array)))), key=lambda x: x[1])
+
+        rate = min(rate_original, rate_transliteration, rate_qwerty)
+        if rate == rate_original:
+            command = command_original
+            # print(text, command, "original", rate)
+        elif rate == rate_transliteration:
+            command = command_transliteration
+            # print(text, command, "transliteration", rate)
+        else:
+            command = command_qwerty
+            # print(text, command, "qwerty", rate)
+
+        # Подобранное значение для определения совпадения текста среди значений указанного списка
+        # Если True, считаем что слишком много ошибок в слове, т.е. text среди запросов нет
+        if rate > 0.6:
+            return
+
+        return command

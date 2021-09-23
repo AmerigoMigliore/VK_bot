@@ -1,6 +1,8 @@
 import json
 import threading
 import sqlite3
+from transliterate.discover import autodiscover
+from transliterate.base import TranslitLanguagePack, registry
 
 # Все id пользователей, которые когда-либо использовали бота
 users = None
@@ -22,6 +24,22 @@ game_math_top = {}
 # Таймер для сохранения всех данных в json
 timer: threading.Timer
 
+# Регистрация транслитерации по раскладке клавиатуры
+autodiscover()
+
+
+class QWERTYLanguagePack(TranslitLanguagePack):
+    language_code = "qwerty"
+    language_name = "KeyBoard"
+    mapping = (
+       'QWERTYUIOP{}ASDFGHJKL:"ZXCVBNM<>?qwertyuiop[]asdfghjkl;\'zxcvbnm,./',
+       'ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ,йцукенгшщзхъфывапролджэячсмитьбю.',
+    )
+
+
+registry.register(QWERTYLanguagePack)
+
+# Загрузки данных из файлов
 with open("users_id.json", "r") as read_file:
     if len(read_file.read()) == 0:
         users = list()
@@ -53,6 +71,8 @@ with open("gamers_active.json", "r", encoding='utf-8') as read_file:
 synonyms_con = sqlite3.connect('answers.db')
 synonyms_cur = synonyms_con.cursor()
 synonyms_cur.execute('CREATE TABLE IF NOT EXISTS synonyms_global(word text PRIMARY KEY, request text);')
+synonyms_con.commit()
+synonyms_cur.executemany('INSERT OR IGNORE INTO synonyms_global VALUES(?, ?);', ((word, word) for word in answers.get('global').keys()))
 synonyms_con.commit()
 
 
