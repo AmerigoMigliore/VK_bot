@@ -4,17 +4,16 @@ import sqlite3
 from transliterate.discover import autodiscover
 from transliterate.base import TranslitLanguagePack, registry
 
-# Все id пользователей, которые когда-либо использовали бота
-users = None
-# Классы, с которыми сейчас работают пользователи TODO: Сохранять в Json
-# TODO: В файл с users добавить where_are_users и user_roles
-where_are_users = {}
+# Вся информация о пользователях
+# id: role, class, method, args
+users_info = {}
+roles = {'user': 0, 'moderator': 1, 'admin': 2, 'master': 3}
 
 # Все ответы на запросы пользователей
 answers = {}
-# Таблица синонимов
-synonyms_con = None
-synonyms_cur = None
+# Связь с базой данных
+db_connect = None
+db_cursor = None
 
 # Статистика всех, кто сейчас играет в GameMath
 game_math_stats = {}
@@ -39,15 +38,8 @@ class QWERTYLanguagePack(TranslitLanguagePack):
 
 registry.register(QWERTYLanguagePack)
 
-# Загрузки данных из файлов
-with open("users_id.json", "r") as read_file:
-    if len(read_file.read()) == 0:
-        users = list()
-    else:
-        read_file.seek(0)
-        users = list(json.load(read_file))
-    read_file.close()
 
+# Загрузки данных из файлов
 with open("answers.json", "r", encoding='utf-8') as read_file:
     if len(read_file.read()) == 0:
         raise ValueError("Список ответов пуст!")
@@ -68,12 +60,16 @@ with open("gamers_active.json", "r", encoding='utf-8') as read_file:
     read_file.close()
 
 # Настройка базы данных синонимов для ответов
-synonyms_con = sqlite3.connect('answers.db')
-synonyms_cur = synonyms_con.cursor()
-synonyms_cur.execute('CREATE TABLE IF NOT EXISTS synonyms_global(word text PRIMARY KEY, request text);')
-synonyms_con.commit()
-synonyms_cur.executemany('INSERT OR IGNORE INTO synonyms_global VALUES(?, ?);', ((word, word) for word in answers.get('global').keys()))
-synonyms_con.commit()
+db_connect = sqlite3.connect('all_data.db')
+db_cursor = db_connect.cursor()
+db_cursor.execute('CREATE TABLE IF NOT EXISTS synonyms_global(word text PRIMARY KEY, request text);')
+db_cursor.executemany('INSERT OR IGNORE INTO synonyms_global VALUES(?, ?);', ((word, word) for word in answers.get('global').keys()))
+db_connect.commit()
+
+db_cursor.execute('CREATE TABLE IF NOT EXISTS users_info(id text PRIMARY KEY, role text, class text, method text, args text)')
+db_connect.commit()
+db_cursor.execute('SELECT id, role, class, method, args FROM users_info')
+users_info = {x[0]: {'role': x[1], 'class': x[2], 'method': x[3], 'args': x[4]} for x in db_cursor.fetchall()}  # [(id, role, class, method, args), (,,,,), ...]
 
 
 def set_next_save_all():
@@ -85,9 +81,13 @@ def set_next_save_all():
 def save_all(is_finally=False):
     global timer
 
-    with open("users_id.json", "w") as write_file:
-        json.dump(users, write_file)
-        write_file.close()
+    db_connect_save = sqlite3.connect('all_data.db')
+    db_cursor_save = db_connect_save.cursor()
+
+    if users_info != {}:
+        db_cursor_save.executemany('INSERT OR REPLACE INTO users_info(id, role, class, method, args) VALUES(?, ?, ?, ?, ?)',
+                                   [(item[0], item[1].get('role'), item[1].get('class'), item[1].get('method'), item[1].get('args'))
+                                    for item in users_info.items()])
 
     with open("answers.json", "w", encoding='utf-8') as write_file:
         json.dump(answers, write_file, ensure_ascii=False)
@@ -102,6 +102,10 @@ def save_all(is_finally=False):
     else:
         if timer is not None:
             timer.cancel()
+
+    db_connect_save.commit()
+    db_cursor_save.close()
+    db_connect_save.close()
 
     print("\n\033[1m\033[32m\033[40m"
           "All data has been saved!"

@@ -1,5 +1,5 @@
 from all_games import *
-from data import answers, synonyms_cur, synonyms_con
+from data import answers, db_cursor, db_connect, users_info, roles
 import numpy as np
 from pyxdameraulevenshtein import normalized_damerau_levenshtein_distance_seqs
 from transliterate import translit
@@ -22,9 +22,10 @@ class Autoresponder:
                          '!рандом': [self.choose_random, ""],
                          '!игра': [self.game_math_start, ""],
                          '!рейтинг математики': [self.get_top_math, ""],
-                         '!!добавить синонимы': [self.add_synonyms, "[Только для администраторов]\nЗапрос\nСиноним\nСиноним\n..."],
-                         '!!удалить синонимы': [self.delete_synonyms, "[Только для администраторов]\nСиноним\nСиноним\n..."],
-                         '!!синонимы': [self.get_synonyms, "[Только для администраторов]\nЗапрос"]
+                         '!!добавить синонимы': [self.add_synonyms, "Запрос\nСиноним\nСиноним\n..."],
+                         '!!удалить синонимы': [self.delete_synonyms, "Синоним\nСиноним\n..."],
+                         '!!синонимы': [self.get_synonyms, "Запрос"],
+                         '!!!изменить роль': [self.set_role, "ID\nРоль"]
                          }
         self.methods = {'': self.choose_random}
         self.errors = [  # TODO: Поменять на что-то нормальное
@@ -52,7 +53,7 @@ class Autoresponder:
             созданный администраторами бота.
 
         2. Сообщение-команда.
-            - Формат сообщения: символ '!', тело команды, символ '/n', аргументы команды, разделенные символами '/n'.
+            - Формат сообщения: символ(-ы) '!', тело команды, символ '/n', аргументы команды, разделенные символами '/n'.
             - Действия при получении сообщения: передать сообщение в метод read_command.
             - Ответ на сообщение: нет или пришедшая после обработки сообщения в read_command строка.
 
@@ -65,7 +66,7 @@ class Autoresponder:
         if event.type == VkBotEventType.MESSAGE_EVENT:
             user_id = str(event.obj.user_id)
 
-            method = where_are_users.get(user_id, {}).get('method')
+            method = users_info.get(user_id, {}).get('method')
             if method == "choose_random":
                 self.choose_random(event.obj.payload.get('args'), user_id)
 
@@ -84,10 +85,10 @@ class Autoresponder:
                 answers[user_id] = {}
 
             # Получаем метод, с которым работает пользователь, и если он не пуст, перенаправляем сообщение в данный метод
-            method = where_are_users.get(user_id, {}).get('method')
+            method = users_info.get(user_id, {}).get('method')
             if method is not None:
                 if method == "choose_random":
-                    self.choose_random(where_are_users.get(user_id, {}).get('args'), user_id, message)
+                    self.choose_random(users_info.get(user_id, {}).get('args'), user_id, message)
 
             else:
                 if message == "" or not self.is_command(message):
@@ -99,13 +100,13 @@ class Autoresponder:
                         answer = self.errors[0]
                     else:
                         # Получение всех доступных синонимов
-                        synonyms_cur.execute(f'SELECT word FROM synonyms_global')
-                        all_synonyms = synonyms_cur.fetchall()
+                        db_cursor.execute(f'SELECT word FROM synonyms_global')
+                        all_synonyms = db_cursor.fetchall()
                         all_synonyms = [x[0] for x in all_synonyms] if len(all_synonyms) > 0 else list(answers.get('global').keys())
 
                         # Получение слова-синонима для данного запроса (если есть)
-                        synonyms_cur.execute(f'SELECT request FROM synonyms_global WHERE word="{self.fix_command(message, all_synonyms)}";')
-                        request = synonyms_cur.fetchone()
+                        db_cursor.execute(f'SELECT request FROM synonyms_global WHERE word="{self.fix_command(message, all_synonyms)}";')
+                        request = db_cursor.fetchone()
 
                         # Получение списка всех возможных ответов на данный запрос
                         answer = answers.get("global").get(request[0] if request is not None else None, []) + \
@@ -116,7 +117,6 @@ class Autoresponder:
                             answer = answer[random.randint(0, len(answer) - 1)]
                         else:
                             answer = self.errors[0]
-
 
                     # Если ответ - стикер (формат: ##ID, где ID - id стикера)
                     if answer[0:2] == "##":
@@ -144,7 +144,7 @@ class Autoresponder:
 
     def read_command(self, msg, user_id):
         """ Обработка команд по шаблону:
-            - Первая строка: !команда.
+            - Первая строка: команда.
             - Последующие строки: аргумент(-ы) команды.
 
         Примечания:
@@ -223,8 +223,9 @@ class Autoresponder:
         answers[user_id][request] = all_responses
 
         # Возврат сообщения о завершении добавления ответов
-        return "На запрос \"{}\" добавлены ответы: {}\n\n Проигнорированы ответы: {}" \
-            .format(request.capitalize(), return_added_responses, return_invalid_responses)
+        return f'На запрос "{request.capitalize()}" добавлены ответы:' \
+               f'{return_added_responses}\n\n' \
+               f'Проигнорированы ответы: {return_invalid_responses}'
 
     def delete_response(self, arg, user_id):
         """ Выборочное удаление ответов на запрос для данного пользователя.
@@ -261,7 +262,7 @@ class Autoresponder:
 
         # Проверка запроса на существование в словаре ответов для данного пользователя
         if request not in answers.get(user_id):
-            return "Запрос \"{}\" не найден в Вашем словаре ответов".format(request.capitalize())
+            return f'Запрос "{request.capitalize()}" не найден в Вашем словаре ответов'
 
         # Получение уже имеющихся ответов по данному запросу из словаря для данного пользователя
         all_responses = answers.get(user_id).get(request, [])
@@ -272,10 +273,10 @@ class Autoresponder:
         for response in split[1:]:
             response.strip()
             if response not in all_responses:
-                return_invalid_responses += "\n\"{}\"".format(response)
+                return_invalid_responses += f'\n"{response}"'
             else:
                 all_responses.remove(response)
-                return_deleted_responses += "\n\"{}\"".format(response)
+                return_deleted_responses += f'\n"{response}"'
 
         # Проверка запроса на наличие ответов и удаление необходимых ответов из словаря для данного пользователя
         if len(all_responses) == 0:
@@ -286,10 +287,11 @@ class Autoresponder:
 
         # Возврат сообщения о завершении удаления ответов
         if is_deleted_all:
-            return "Запрос \"{}\" полностью удален из Вашего словаря ответов".format(request.capitalize())
+            return f'Запрос "{request.capitalize()}" полностью удален из Вашего словаря ответов'
         else:
-            return "На запрос \"{}\" удалены ответы: {}\n\n Проигнорированы ответы: {}" \
-                .format(request.capitalize(), return_deleted_responses, return_invalid_responses)
+            return f'На запрос "{request.capitalize()}" удалены ответы: ' \
+                   f'{return_deleted_responses}\n\n' \
+                   f'Проигнорированы ответы: {return_invalid_responses}'
 
     def delete_all_responses(self, arg, user_id):
         """ Удаление всего запроса для данного пользователя.
@@ -314,43 +316,43 @@ class Autoresponder:
 
         # Проверка запроса на существование в словаре ответов для данного пользователя
         if request not in answers.get(user_id):
-            return "Запрос \"{}\" не найден в Вашем словаре ответов".format(request.capitalize())
+            return f'Запрос "{request.capitalize()}" не найден в Вашем словаре ответов'
 
         # Удаление всего запроса из словаря ответов для данного пользователя
         answers.get(user_id).pop(request)
 
         # Возврат сообщения о завершении удаления ответов
-        return "Запрос \"{}\" полностью удален из Вашего словаря ответов".format(request.capitalize())
+        return f'Запрос "{request.capitalize()}" полностью удален из Вашего словаря ответов'
 
     def add_synonyms(self, arg, user_id):
-        # TODO: Брать из списка администраторов
-        if str(user_id) != "171254367":
+        user_id = str(user_id)
+        if roles[users_info.get(user_id).get('role')] < roles['moderator']:
             return "Недостаточный уровень доступа"
         else:
             split = arg.split('\n')
             request = split[0].lower().strip()
             if request not in answers.get('global').keys():
-                return f'Запрос {request} не найден в словаре ответов.'
+                return f'Запрос "{request}" не найден в словаре ответов.'
             if len(split) < 2:
                 return self.errors[2]
             else:
-                synonyms_cur.executemany('INSERT OR IGNORE INTO synonyms_global VALUES(?, ?);', ((word.lower().strip(), request) for word in split[1:]))
-                synonyms_con.commit()
+                db_cursor.executemany('INSERT OR IGNORE INTO synonyms_global VALUES(?, ?);', ((word.lower().strip(), request) for word in split[1:]))
+                db_connect.commit()
                 n = '\n'
                 return f'К запросу "{request}" добавлены синонимы:\n' \
                        f'{n.join([word.capitalize().strip() for word in split[1:]])}'
 
     def get_synonyms(self, arg, user_id):
-        # TODO: Брать из списка администраторов
-        if str(user_id) != "171254367":
+        user_id = str(user_id)
+        if roles[users_info.get(user_id).get('role')] < roles['moderator']:
             return "Недостаточный уровень доступа"
         else:
             split = arg.split('\n')
             if len(split) != 1:
                 return self.errors[2]
             else:
-                synonyms_cur.execute(f'SELECT word FROM synonyms_global WHERE request="{split[0].lower().strip()}"')
-                synonyms = synonyms_cur.fetchall()
+                db_cursor.execute(f'SELECT word FROM synonyms_global WHERE request="{split[0].lower().strip()}"')
+                synonyms = db_cursor.fetchall()
                 if len(synonyms) == 0:
                     return f'Запрос "{split[0].capitalize()}" не имеет синонимов'
                 else:
@@ -359,8 +361,8 @@ class Autoresponder:
                            f'{n.join((word[0].capitalize() for word in synonyms))}'
 
     def delete_synonyms(self, arg, user_id):
-        # TODO: Брать из списка администраторов
-        if str(user_id) != "171254367":
+        user_id = str(user_id)
+        if roles[users_info.get(user_id).get('role')] < roles['moderator']:
             return "Недостаточный уровень доступа"
         else:
             split = arg.split('\n')
@@ -368,8 +370,8 @@ class Autoresponder:
             if len(split) < 2:
                 return self.errors[2]
             else:
-                synonyms_cur.execute(f'SELECT word FROM synonyms_global WHERE request="{request}"')
-                synonyms = synonyms_cur.fetchall()
+                db_cursor.execute(f'SELECT word FROM synonyms_global WHERE request="{request}"')
+                synonyms = db_cursor.fetchall()
                 if len(synonyms) == 0:
                     return f'Запрос "{request.capitalize()}" не имеет синонимов для удаления'
                 else:
@@ -378,11 +380,11 @@ class Autoresponder:
                     return_invalid_synonyms = str()
                     for word in split[1:]:
                         if word.lower().strip() in synonyms and word.lower().strip() != request:
-                            synonyms_cur.execute(f'DELETE FROM synonyms_global WHERE word="{word.lower().strip()}";')
+                            db_cursor.execute(f'DELETE FROM synonyms_global WHERE word="{word.lower().strip()}";')
                             return_deleted_synonyms += f"\n\"{word.capitalize()}\""
                         else:
                             return_invalid_synonyms += f"\n\"{word.capitalize()}\""
-                    synonyms_con.commit()
+                    db_connect.commit()
 
                     return f'У запроса "{request}" ' \
                            f'удалены синонимы:\n{return_deleted_synonyms}\n\n' \
@@ -405,12 +407,12 @@ class Autoresponder:
         # Получение всех глобальных запросов и их запись в сообщение для ответа
         string_requests += "Глобальные запросы:\n"
         for request in answers.get("global").keys():
-            string_requests += "\n{}".format(request.capitalize())
+            string_requests += f'\n{request.capitalize()}'
 
         # Получение всех локальных запросов и их запись в сообщение для ответа
         string_requests += "\n\nВаши запросы:\n"
         for request in answers.get(user_id).keys():
-            string_requests += "\n{}".format(request.capitalize())
+            string_requests += f'\n{request.capitalize()}'
 
         # Возврат сообщения со списком всех доступных запросов
         return string_requests
@@ -437,17 +439,17 @@ class Autoresponder:
 
         # Проверка запроса на существование в словаре ответов для данного пользователя
         if request not in answers.get(user_id):
-            return "Запрос \"{}\" не найден в Вашем словаре ответов".format(request.capitalize())
+            return f'Запрос "{request.capitalize()}" не найден в Вашем словаре ответов'
 
         # Получение всех ответов на данный запрос для данного пользователя и их запись в сообщение для ответа
         all_responses = answers.get(user_id).get(request)
         for response in all_responses:
             if response[0:2] == "##":
-                response = "Стикер №{}".format(response[2:])
-            string_responses += "\n{}".format(response)
+                response = f'Стикер №{response[2:]}'
+            string_responses += f'\n{response}'
 
         # Возврат сообщения со списком всех доступных запросов
-        return "Ответы на запрос \"{}\":\n{}".format(request.capitalize(), string_responses)
+        return f'Ответы на запрос "{request.capitalize()}":\n{string_responses}'
 
     def get_all_commands(self, arg=None, user_id=None):
         """ Предоставление списка всех доступных команд бота.
@@ -462,20 +464,23 @@ class Autoresponder:
         """
         string_commands = str()
         number = 1
+        role = roles[users_info.get(user_id, {}).get('role', 'user')] + 1
 
         # Получение всех команд и их запись в сообщение для ответа
         for command in self.commands.items():
-            string_commands += "\n{}. {}\n{}\n\n".format(number, command[0].capitalize(), command[1][1])
-            number += 1
+            if command[0].count('!') <= role:
+                string_commands += f'\n{number}. {command[0].capitalize()}\n{command[1][1]}\n\n'
+                number += 1
 
-        return "Команды:\n{}".format(string_commands)
+        return f'Команды:\n{string_commands}'
 
     def choose_random(self, arg, user_id, message=None):
-        answer = str()
+        users_info[user_id]['args'] = arg
 
         # Завершение работы с генератором и возврат к автоответчику
         if message is not None and message.lower() == 'назад':
-            where_are_users[user_id] = {'class': 'autoresponder', 'method': None, 'args': None}
+            users_info[user_id]['method'] = None
+            users_info[user_id]['args'] = None
             vk_session.method('messages.send',
                               {'user_id': int(user_id), 'message': "Вы завершили работу с генератором случайных чисел",
                                'random_id': 0, 'keyboard': self.keyboard})
@@ -483,13 +488,12 @@ class Autoresponder:
 
         # Случайное вещественное число от 0 до 1
         elif arg == 'random':
-            where_are_users[user_id]['args'] = None
+            users_info[user_id]['args'] = None
             answer = f"Ваше случайное число: {random.random()}"
 
         # Случайное целое число от A до B
         elif arg == 'randint':
             if message is None:
-                where_are_users[user_id]['args'] = 'randint'
                 answer = f"Случайное целое число от A до B\n" \
                          f"Введите 2 целых числа через пробел - граничные значения A и B"
             else:
@@ -502,7 +506,6 @@ class Autoresponder:
         # Случайное вещественное число от A до B
         elif arg == 'uniform':
             if message is None:
-                where_are_users[user_id]['args'] = 'uniform'
                 answer = f"Случайное вещественное число от A до B\n" \
                          f"Введите 2 вещественных числа через пробел - граничные значения A и B"
             else:
@@ -515,7 +518,6 @@ class Autoresponder:
         # Случайный элемент последовательности
         elif arg == 'choice':
             if message is None:
-                where_are_users[user_id]['args'] = 'choice'
                 answer = f"Случайный элемент последовательности\n" \
                          f"Введите последовательность элементов через пробел"
             elif len(message.split(' ')) > 0:
@@ -558,7 +560,6 @@ class Autoresponder:
         # Бета-распределение
         elif arg == 'betavariate':
             if message is None:
-                where_are_users[user_id]['args'] = 'betavariate'
                 answer = f"Бета-распределение\n" \
                          f"Введите значения α (>0) и β (>0) через пробел"
             else:
@@ -572,7 +573,6 @@ class Autoresponder:
         # Гамма-распределение
         elif arg == 'gammavariate':
             if message is None:
-                where_are_users[user_id]['args'] = 'gammavariate'
                 answer = f"Гамма-распределение\n" \
                          f"Введите значения α (>0) и β (>0) через пробел"
             else:
@@ -586,7 +586,6 @@ class Autoresponder:
         # Экспоненциальное распределение
         elif arg == 'expovariate':
             if message is None:
-                where_are_users[user_id]['args'] = 'expovariate'
                 answer = f"Экспоненциальное распределение\n" \
                          f"Введите значение λ (≠0) через пробел"
             else:
@@ -599,7 +598,6 @@ class Autoresponder:
         # Нормальное распределение
         elif arg == 'normalvariate':
             if message is None:
-                where_are_users[user_id]['args'] = 'normalvariate'
                 answer = f"Нормальное распределение\n" \
                          f"Введите значения μ и σ (>0) через пробел"
             else:
@@ -640,11 +638,28 @@ class Autoresponder:
                                'random_id': 0,
                                'keyboard': keyboard})
 
-            where_are_users[user_id] = {'class': 'autoresponder', 'method': 'choose_random', 'args': None}
+            users_info[user_id]['method'] = 'choose_random'
+            users_info[user_id]['args'] = None
             return
 
         vk_session.method('messages.send',
                           {'user_id': int(user_id), 'message': answer, 'random_id': 0})
+
+    def set_role(self, arg, admin_id):
+        admin_id = str(admin_id)
+        if roles[users_info.get(admin_id).get('role')] < roles['admin']:
+            return "Недостаточный уровень доступа" + users_info.get(admin_id).get('role')
+
+        split = [x.lower().strip() for x in arg.split('\n')]
+        if len(split) != 2 or not split[0].isdigit() or split[1] not in roles:
+            return self.errors[2]
+        elif split[0] not in users_info.keys():
+            return 'Пользователь не найден'
+        elif split[0] == admin_id:
+            return 'Вы не можете изменить свою роль'
+        else:
+            users_info[split[0]]['role'] = split[1]
+            return f'Пользователю "{split[0]}" выдана роль "{split[1]}"'
 
     @staticmethod
     def get_top_math(arg, user_id):
@@ -668,7 +683,7 @@ class Autoresponder:
         :param user_id: ID пользователя, вызвавшего команду.
         :type user_id: int или str.
         """
-        where_are_users.update({user_id: {'class': 'game_math'}})
+        users_info[user_id]['class'] = 'game_math'
         game_math_class.start(str(user_id))
 
     @staticmethod

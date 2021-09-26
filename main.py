@@ -1,7 +1,7 @@
 # >Created by ATB<
 
 import sys
-from data import users, save_all
+from data import roles, save_all
 from vk_auth import longpoll
 from autoresponder import Autoresponder
 from all_games import *
@@ -26,14 +26,13 @@ def main():
                         # Получение сообщения
                         message = event.obj.text
 
-                        # Проверка на команды от администратора TODO: Брать из списка администраторов
-                        if user_id == 171254367:
+                        if roles[users_info.get(str(user_id), {}).get('role', 'user')] >= roles['admin']:
 
                             # Рассылка для всех зарегистрированных пользователей (!рассылка#сообщение)
                             if message.split('#')[0].strip().lower() == '!рассылка':
-                                for user_info in users:
+                                for to_id in users_info.keys():
                                     vk_session.method('messages.send',
-                                                      {'user_id': user_info, 'message': message.split('#')[1].strip(),
+                                                      {'user_id': to_id, 'message': message.split('#')[1].strip(),
                                                        'random_id': 0})
 
                             # Включение/выключение бота
@@ -61,16 +60,16 @@ def main():
                             break
 
                         # Регистрация пользователей при первом запросе
-                        if user_id not in users:
-                            users.append(user_id)
+                        if str(user_id) not in users_info.keys():
+                            users_info[str(user_id)] = {'role': 'user', 'class': 'autoresponder', 'method': None, 'args': None}
 
                         # Основная обработка сообщений
-                        all_classes.get(where_are_users.get(str(user_id), {}).get('class', 'autoresponder'))\
+                        all_classes.get(users_info.get(str(user_id), {}).get('class', 'autoresponder'))\
                             .process_event(event=event)
 
                     # Обработка событий
                     if event.type == VkBotEventType.MESSAGE_EVENT:
-                        all_classes.get(where_are_users.get(str(event.obj.user_id), {}).get('class', 'autoresponder'))\
+                        all_classes.get(users_info.get(str(event.obj.user_id), {}).get('class', 'autoresponder'))\
                             .process_event(event=event)
 
                     # TODO: ТЕСТИРОВАТЬ!!!

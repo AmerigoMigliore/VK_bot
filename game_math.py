@@ -3,7 +3,7 @@ import json
 import threading
 from vk_auth import vk_session, VkBotEventType
 from keyboard import *
-from data import game_math_stats, game_math_top, where_are_users
+from data import game_math_stats, game_math_top, users_info
 
 
 def create_keyboard(nums):
@@ -216,7 +216,7 @@ class GameMath:
                                'random_id': 0, 'keyboard': self.end_keyboard_without_lives})
 
             game_math_stats[user_id]['score'] = 0
-            where_are_users.update({user_id: {'class': 'autoresponder'}})
+            users_info[user_id]['class'] = 'autoresponder'
 
         # Обновление значений
         game_math_stats[user_id]['is_active'] = False
