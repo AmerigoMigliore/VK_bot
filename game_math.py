@@ -55,13 +55,14 @@ class GameMath:
     start_keyboard = None
     end_keyboard_without_lives = None
     end_keyboard_with_lives = None
+    end_keyboard = None
     continue_game_keyboard = None
     timers = {}
 
     def __init__(self):
         self.texts = [  # TODO: Поменять на что-то нормальное
             # 0
-            'Кто это тут у нас рискнул сыграть со мной в игру?',
+            'Приветствую тебя, математик великий! Сыграть в игру захотел со мной?',
             # 1
             'Правила просты: я даю тебе пример, 4 варианта ответа и 5 секунд на размышления.\n'
             'Успеешь выбрать правильный - получишь следующий пример.\n'
@@ -109,12 +110,22 @@ class GameMath:
             },
             ensure_ascii=False))
 
-        self.end_keyboard_without_lives = str(json.dumps({
+        self.end_keyboard = str(json.dumps({
                 "one_time": False,
                 "buttons": [
                     [get_text_button('!Все запросы', 'primary'), get_text_button('!Все команды', 'primary')]
                 ]
             }, ensure_ascii=False))
+
+        self.end_keyboard_without_lives = str(json.dumps(
+            {
+                "inline": True,
+                "buttons": [
+                    [get_text_button('Новая игра', 'primary'), get_text_button('Завершить игру', 'negative')],
+                    [get_text_button('!Рейтинг математики', 'secondary')]
+                ]
+            },
+            ensure_ascii=False))
 
         self.end_keyboard_with_lives = str(json.dumps(
             {
@@ -174,14 +185,13 @@ class GameMath:
                 self.rules(user_id)
             elif message == '!рейтинг математики':
                 self.get_top(user_id)
+            elif message == 'завершить игру':
+                self.end(user_id, True)
             else:
                 self.end(user_id)
 
     def start(self, user_id):
         user_id = str(user_id)
-        vk_session.method('messages.send',
-                          {'user_id': int(user_id), 'message': self.texts[0],
-                           'random_id': 0, 'keyboard': self.start_keyboard})
         if game_math_stats.get(user_id) is None:
             # Регистрация нового ирока
             game_math_stats.update({user_id: {'is_active': True, 'lives': 5, 'answer': None, 'score': 0}})
@@ -190,7 +200,12 @@ class GameMath:
             game_math_stats.update({user_id: {'is_active': True, 'lives': game_math_stats.get(user_id).get('lives'),
                                               'answer': None, 'score': 0}})
 
-    def end(self, user_id):
+        vk_session.method('messages.send',
+                          {'user_id': int(user_id), 'message': self.texts[0] +
+                              f'\nНа счету {game_math_stats.get(user_id).get("lives")}❤',
+                           'random_id': 0, 'keyboard': self.start_keyboard})
+
+    def end(self, user_id, back=False):
         user_id = str(user_id)
         self.cancel_timer(user_id)
 
@@ -203,27 +218,34 @@ class GameMath:
             # Запись нового рекорда в рейтинг
             game_math_top.update({user_id: {'name': name, 'record': game_math_stats.get(user_id).get('score')}})
 
-        if game_math_stats.get(user_id).get('lives') > 0 and game_math_stats.get(user_id).get('is_active'):
+        if back:
+            # Если пользователь хочет закончить игру
+            vk_session.method('messages.send',
+                              {'user_id': int(user_id),
+                               'message': 'Спасибо за игру!\nПомни, что ты всегда можешь побить свой рекорд!',
+                               'random_id': 0, 'keyboard': self.end_keyboard})
+
+            game_math_stats[user_id]['score'] = 0
+            users_info[user_id]['class'] = 'autoresponder'
+
+        elif game_math_stats.get(user_id).get('lives') > 0 and game_math_stats.get(user_id).get('is_active'):
             # Если есть жизни
             vk_session.method('messages.send',
                               {'user_id': int(user_id),
                                'message': f"Вы дали правильных ответов: {game_math_stats.get(user_id).get('score')}\n"
                                           f"Ваш рекорд: {game_math_top.get(user_id).get('record')}\n"
-                                          f"У Вас {game_math_stats.get(user_id).get('lives')}❤\n"
+                                          f"На счету {game_math_stats.get(user_id).get('lives')}❤\n"
                                           f"Желаете продолжить игру?",
                                'random_id': 0, 'keyboard': self.end_keyboard_with_lives})
         else:
             # Если нет жизней
             vk_session.method('messages.send',
                               {'user_id': int(user_id),
-                               'message': f"{self.texts[2]}\n"
-                                          f"Вы дали правильных ответов: {game_math_stats.get(user_id).get('score')}\n"
+                               'message': f"Вы дали правильных ответов: {game_math_stats.get(user_id).get('score')}\n"
                                           f"Ваш рекорд: {game_math_top.get(user_id).get('record')}\n"
-                                          f"У Вас {game_math_stats.get(user_id).get('lives')}❤",
+                                          f"На счету {game_math_stats.get(user_id).get('lives')}❤\n"
+                                          f"Сыграем еще раз?",
                                'random_id': 0, 'keyboard': self.end_keyboard_without_lives})
-
-            game_math_stats[user_id]['score'] = 0
-            users_info[user_id]['class'] = 'autoresponder'
 
         # Обновление значений
         game_math_stats[user_id]['is_active'] = False
