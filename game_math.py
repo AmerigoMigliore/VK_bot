@@ -232,19 +232,19 @@ class GameMath:
             # Если есть жизни
             vk_session.method('messages.send',
                               {'user_id': int(user_id),
-                               'message': f"Вы дали правильных ответов: {game_math_stats.get(user_id).get('score')}\n"
-                                          f"Ваш рекорд: {game_math_top.get(user_id).get('record')}\n"
-                                          f"На счету {game_math_stats.get(user_id).get('lives')}❤\n"
-                                          f"Желаете продолжить игру?",
+                               'message': f'Вы дали правильных ответов: {game_math_stats.get(user_id).get("score")}\n'
+                                          f'Ваш рекорд: {game_math_top.get(user_id).get("record")}\n'
+                                          f'На счету {game_math_stats.get(user_id).get("lives")}❤\n'
+                                          f'Желаете продолжить игру?',
                                'random_id': 0, 'keyboard': self.end_keyboard_with_lives})
         else:
             # Если нет жизней
             vk_session.method('messages.send',
                               {'user_id': int(user_id),
-                               'message': f"Вы дали правильных ответов: {game_math_stats.get(user_id).get('score')}\n"
-                                          f"Ваш рекорд: {game_math_top.get(user_id).get('record')}\n"
-                                          f"На счету {game_math_stats.get(user_id).get('lives')}❤\n"
-                                          f"Сыграем еще раз?",
+                               'message': f'Вы дали правильных ответов: {game_math_stats.get(user_id).get("score")}\n'
+                                          f'Ваш рекорд: {game_math_top.get(user_id).get("record")}\n'
+                                          f'"На счету {game_math_stats.get(user_id).get("lives")}❤\n"'
+                                          f'Сыграем еще раз?',
                                'random_id': 0, 'keyboard': self.end_keyboard_without_lives})
 
         # Обновление значений
@@ -274,7 +274,8 @@ class GameMath:
                 game_math_stats[user_id]['lives'] += 1
                 vk_session.method('messages.send',
                                   {'user_id': int(user_id),
-                                   'message': 'Вы достигли больших результатов и зарабатываете ❤!',
+                                   'message': f'Вы достигли больших результатов и зарабатываете ❤!\n'
+                                              f'На счету {game_math_stats.get(user_id).get("lives")}❤',
                                    'random_id': 0})
 
             vk_session.method('messages.send',
