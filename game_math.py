@@ -241,11 +241,12 @@ class GameMath:
         self.cancel_timer(user_id)
 
         if not game_math_stats.get(user_id).get('is_active'):
-            self.start(user_id)
+            if answer == "":
+                self.start(user_id)
             return
 
         # Если дано кратно 5 верных ответов -> переход на новый уровень
-        if answer.lower() == "" and game_math_stats.get(user_id).get('score') % 5 == 0:
+        if answer == "" and game_math_stats.get(user_id).get('score') % 5 == 0:
 
             if game_math_stats.get(user_id).get('score') >= 25:
                 game_math_stats[user_id]['lives'] += 1
