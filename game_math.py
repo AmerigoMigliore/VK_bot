@@ -79,49 +79,50 @@ class GameMath:
 
         self.game_levels = {
             0: {"min": 10, "max": 20, "actions": [plus]},
-            1: {"min": 10, "max": 50, "actions": [plus]},
-            2: {"min": 10, "max": 99, "actions": [plus]},
+            1: {"min": 10, "max": 20, "actions": [minus]},
+            2: {"min": 10, "max": 20, "actions": [multiplication]},
+            3: {"min": 10, "max": 20, "actions": [division]},
 
-            3: {"min": 10, "max": 20, "actions": [plus, minus]},
             4: {"min": 10, "max": 50, "actions": [plus, minus]},
             5: {"min": 10, "max": 99, "actions": [plus, minus]},
+            6: {"min": 100, "max": 199, "actions": [plus, minus]},
+            7: {"min": 100, "max": 999, "actions": [plus, minus]},
 
-            6: {"min": 5, "max": 10, "actions": [multiplication]},
-            7: {"min": 5, "max": 20, "actions": [multiplication]},
-            8: {"min": 5, "max": 50, "actions": [multiplication]},
+            8: {"min": 10, "max": 50, "actions": [multiplication, division]},
+            9: {"min": 10, "max": 99, "actions": [multiplication, division]},
+            10: {"min": 100, "max": 199, "actions": [multiplication, division]},
+            11: {"min": 100, "max": 999, "actions": [multiplication, division]},
 
-            9: {"min": 5, "max": 10, "actions": [multiplication, division]},
-            10: {"min": 5, "max": 20, "actions": [multiplication, division]},
-            11: {"min": 5, "max": 50, "actions": [multiplication, division]},
+            12: {"min": 10, "max": 50, "actions": [plus, minus, multiplication, division]},
+            13: {"min": 10, "max": 99, "actions": [plus, minus, multiplication, division]},
+            14: {"min": 100, "max": 999, "actions": [plus, minus, multiplication, division]},
 
-            12: {"min": 1000, "max": 5000, "actions": [plus, minus, multiplication, division]},
+            15: {"min": 1000, "max": 5000, "actions": [plus, minus, multiplication, division]},
         }
 
         self.start_keyboard = str(json.dumps(
             {
-                "inline": True,
+                "one_time": True,
                 "buttons": [
                     [get_text_button('Правила', 'primary'), get_text_button('Начать', 'positive')]
                 ]
             },
             ensure_ascii=False))
 
-        self.end_keyboard_without_lives = str(json.dumps(
-            {
-                "inline": True,
+        self.end_keyboard_without_lives = str(json.dumps({
+                "one_time": False,
                 "buttons": [
-                    [get_text_button('!Математика', 'primary'), get_text_button('!Рейтинг математики', 'secondary')]
-                    # [get_vkpay_button("Buy 5 lives", 1)]
+                    [get_text_button('!Все запросы', 'primary'), get_text_button('!Все команды', 'primary')]
                 ]
-            },
-            ensure_ascii=False))
+            }, ensure_ascii=False))
 
         self.end_keyboard_with_lives = str(json.dumps(
             {
                 "inline": True,
                 "buttons": [
                     [get_callback_button('Использовать ❤', 'positive', {"method": "GameMath.use_lives", "args": None})],
-                    [get_text_button('Новая игра', 'primary'), get_text_button('Завершить игру', 'negative'), get_text_button('!Рейтинг математики', 'secondary')]
+                    [get_text_button('Новая игра', 'primary'), get_text_button('Завершить игру', 'negative')],
+                    [get_text_button('!Рейтинг математики', 'secondary')]
                 ]
             },
             ensure_ascii=False))
@@ -163,9 +164,12 @@ class GameMath:
             user_id = str(event.obj.from_id)
             message = event.obj.text.lower()
 
-            if message == 'начать' or message == 'продолжить' or message == 'новая игра':
+            if message == 'начать' or message == 'продолжить':
                 self.cancel_timer(user_id)
                 self.game(user_id, message)
+            elif message == 'новая игра':
+                self.cancel_timer(user_id)
+                self.start(user_id)
             elif message == 'правила':
                 self.rules(user_id)
             elif message == '!рейтинг математики':
@@ -266,7 +270,7 @@ class GameMath:
                 {user_id: {'is_active': True, 'lives': game_math_stats.get(user_id).get('lives'),
                            'answer': None, 'score': game_math_stats.get(user_id).get('score') + 1}})
             vk_session.method('messages.send',
-                              {'user_id': int(user_id), 'message': "Ваш ответ {} верный!\nВсего правильных ответов: {}!"
+                              {'user_id': int(user_id), 'message': 'Ваш ответ "{}" верный!\nВсего правильных ответов: "{}"!'
                                                         .format(answer, game_math_stats.get(user_id).get('score')),
                                'random_id': 0})
             self.game(user_id, "")
@@ -274,7 +278,7 @@ class GameMath:
         # Окончание игры
         else:
             vk_session.method('messages.send',
-                              {'user_id': int(user_id), 'message': "Ваш ответ {} неверный!\nВерный ответ: {}!"
+                              {'user_id': int(user_id), 'message': 'Ваш ответ "{}" неверный!\nВерный ответ: "{}"!'
                                                         .format(answer, game_math_stats.get(user_id).get('answer')),
                                'random_id': 0})
             self.end(user_id)
@@ -282,8 +286,8 @@ class GameMath:
     def new_formula(self, user_id):
         symbol = ""
         level = game_math_stats.get(user_id).get("score") // 5  # 5 примеров на каждом уровне
-        if level > 12:
-            level = 12
+        if level > 15:
+            level = 15
         rand_min = self.game_levels.get(level).get("min")
         rand_max = self.game_levels.get(level).get("max")
 

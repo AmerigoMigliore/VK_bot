@@ -1,8 +1,10 @@
 from all_games import *
 from data import answers, db_cursor, db_connect, users_info, roles
+import data
 import numpy as np
 from pyxdameraulevenshtein import normalized_damerau_levenshtein_distance_seqs
 from transliterate import translit
+import re
 
 
 class Autoresponder:
@@ -93,30 +95,46 @@ class Autoresponder:
             else:
                 if message == "" or not self.is_command(message):
 
-                    # Удаление лишних небуквенных символов
-                    message = "".join(filter(self.is_correct_character, message.lower().strip()))
+                    # Удаление лишних небуквенных символов и повторов букв в словах
+                    message = re.sub(r'([\D])(\1)+', r'\1', re.sub(r'\W+', ' ', message).lower().strip(), flags=re.I)
+                    # message = "".join(filter(self.is_correct_character, message.lower().strip()))
 
                     if message == "":
                         answer = self.errors[0]
                     else:
-                        # Получение всех доступных синонимов
-                        db_cursor.execute(f'SELECT word FROM synonyms_global')
-                        all_synonyms = db_cursor.fetchall()
-                        all_synonyms = [x[0] for x in all_synonyms] if len(all_synonyms) > 0 else list(answers.get('global').keys())
-
-                        # Получение слова-синонима для данного запроса (если есть)
-                        db_cursor.execute(f'SELECT request FROM synonyms_global WHERE word="{self.fix_command(message, all_synonyms)}";')
-                        request = db_cursor.fetchone()
-
                         # Получение списка всех возможных ответов на данный запрос
-                        answer = answers.get("global").get(request[0] if request is not None else None, []) + \
-                            answers.get("global").get(message, []) + \
+                        answer = answers.get("global").get(message, []) + \
                             answers.get(user_id).get(message, [])
+
+                        # Если найдены точные совпадения сообщения и запроса
                         if len(answer) != 0:
                             # Случайный выбор ответа из полученного списка
                             answer = answer[random.randint(0, len(answer) - 1)]
+
+                        # Если точных совпадений не найдено - проверить по синонимам и опечаткам
                         else:
-                            answer = self.errors[0]
+                            # Получение всех доступных синонимов
+                            db_cursor.execute(f'SELECT word FROM synonyms_global')
+                            all_synonyms = db_cursor.fetchall()
+                            all_synonyms = [x[0] for x in all_synonyms] if len(all_synonyms) > 0 else list(
+                                answers.get('global').keys())
+
+                            # Получение слова-синонима с исправленными опечатками для данного запроса (если есть)
+                            db_cursor.execute(
+                                f'SELECT request FROM synonyms_global WHERE word="{self.fix_command(message, all_synonyms)}";')
+                            request = db_cursor.fetchone()
+
+                            # Получение списка всех возможных ответов на данный запрос
+                            answer = answers.get("global").get(request[0] if request is not None else None, [])
+
+                            # Если найдено совпадение по синонимам с исправленными опечатками
+                            if len(answer) != 0:
+                                # Случайный выбор ответа из полученного списка
+                                answer = answer[random.randint(0, len(answer) - 1)]
+
+                            # Если совпадений не найдено вовсе
+                            else:
+                                answer = self.errors[0]
 
                     # Если ответ - стикер (формат: ##ID, где ID - id стикера)
                     if answer[0:2] == "##":
@@ -730,17 +748,17 @@ class Autoresponder:
         rate = min(rate_original, rate_transliteration, rate_qwerty)
         if rate == rate_original:
             command = command_original
-            # print(text, command, "original", rate)
+            data.synonyms_stats += [(text, command, "original", rate)]
         elif rate == rate_transliteration:
             command = command_transliteration
-            # print(text, command, "transliteration", rate)
+            data.synonyms_stats += [(text, command, "transliteration", rate)]
         else:
             command = command_qwerty
-            # print(text, command, "qwerty", rate)
+            data.synonyms_stats += [(text, command, "qwerty", rate)]
 
         # Подобранное значение для определения совпадения текста среди значений указанного списка
         # Если True, считаем что слишком много ошибок в слове, т.е. text среди запросов нет
-        if rate > 0.6:
+        if rate > 0.5:
             return
 
         return command

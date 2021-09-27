@@ -23,6 +23,9 @@ game_math_top = {}
 # Таймер для сохранения всех данных в json
 timer: threading.Timer
 
+# Логи для обработки данных по синонимичному распознаванию запросов
+synonyms_stats = list()
+
 # Регистрация транслитерации по раскладке клавиатуры
 autodiscover()
 
@@ -71,6 +74,9 @@ db_connect.commit()
 db_cursor.execute('SELECT id, role, class, method, args FROM users_info')
 users_info = {x[0]: {'role': x[1], 'class': x[2], 'method': x[3], 'args': x[4]} for x in db_cursor.fetchall()}  # [(id, role, class, method, args), (,,,,), ...]
 
+db_cursor.execute('CREATE TABLE IF NOT EXISTS synonyms_stats(phrase text PRIMARY KEY, request text, type text, rate real)')
+db_connect.commit()
+
 
 def set_next_save_all():
     global timer
@@ -85,9 +91,14 @@ def save_all(is_finally=False):
     db_cursor_save = db_connect_save.cursor()
 
     if users_info != {}:
-        db_cursor_save.executemany('INSERT OR REPLACE INTO users_info(id, role, class, method, args) VALUES(?, ?, ?, ?, ?)',
+        db_cursor_save.executemany('INSERT OR REPLACE INTO users_info(id, role, class, method, args) VALUES(?, ?, ?, ?, ?);',
                                    [(item[0], item[1].get('role'), item[1].get('class'), item[1].get('method'), item[1].get('args'))
                                     for item in users_info.items()])
+
+    if synonyms_stats:
+        db_cursor_save.executemany('INSERT OR IGNORE INTO synonyms_stats(phrase, request, type, rate) VALUES(?, ?, ?, ?);',
+                                   synonyms_stats)
+        synonyms_stats.clear()
 
     with open("answers.json", "w", encoding='utf-8') as write_file:
         json.dump(answers, write_file, ensure_ascii=False)
