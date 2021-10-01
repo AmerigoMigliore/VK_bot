@@ -1,10 +1,11 @@
+import numpy as np
+import re
+import data
 from all_games import *
 from data import answers, db_cursor, db_connect, users_info, roles
-import data
-import numpy as np
 from pyxdameraulevenshtein import normalized_damerau_levenshtein_distance_seqs
 from transliterate import translit
-import re
+from unicodedata import normalize, category
 
 
 class Autoresponder:
@@ -15,19 +16,19 @@ class Autoresponder:
     keyboard = {}
 
     def __init__(self):
-        self.commands = {'!добавить': [self.add_response, "Запрос\nОтвет\nОтвет\n..."],
-                         '!удалить ответы': [self.delete_response, "Запрос\nОтвет\nОтвет\n..."],
-                         '!удалить запрос': [self.delete_all_responses, "Запрос"],
-                         '!все запросы': [self.get_all_requests, ""],
-                         '!все ответы': [self.get_all_responses, "Запрос"],
-                         '!все команды': [self.get_all_commands, ""],
-                         '!рандом': [self.choose_random, ""],
-                         '!игра': [self.game_math_start, ""],
-                         '!рейтинг математики': [self.get_top_math, ""],
-                         '!!добавить синонимы': [self.add_synonyms, "Запрос\nСиноним\nСиноним\n..."],
-                         '!!удалить синонимы': [self.delete_synonyms, "Синоним\nСиноним\n..."],
-                         '!!синонимы': [self.get_synonyms, "Запрос"],
-                         '!!!изменить роль': [self.set_role, "ID\nРоль"]
+        self.commands = {'!добавить': [self.add_response, 'Запрос\nОтвет\nОтвет\n...'],
+                         '!удалить ответы': [self.delete_response, 'Запрос\nОтвет\nОтвет\n...'],
+                         '!удалить запрос': [self.delete_all_responses, 'Запрос'],
+                         '!все запросы': [self.get_all_requests, ''],
+                         '!все ответы': [self.get_all_responses, 'Запрос'],
+                         '!все команды': [self.get_all_commands, ''],
+                         '!рандом': [self.choose_random, ''],
+                         '!играть': [self.game_start, ''],
+                         '!баланс': [self.get_balance, ''],
+                         '!!добавить синонимы': [self.add_synonyms, 'Запрос\nСиноним\nСиноним\n...'],
+                         '!!удалить синонимы': [self.delete_synonyms, 'Синоним\nСиноним\n...'],
+                         '!!синонимы': [self.get_synonyms, 'Запрос'],
+                         '!!!изменить роль': [self.set_role, 'ID\nРоль']
                          }
         self.methods = {'': self.choose_random}
         self.errors = [  # TODO: Поменять на что-то нормальное
@@ -67,17 +68,21 @@ class Autoresponder:
 
         if event.type == VkBotEventType.MESSAGE_EVENT:
             user_id = str(event.obj.user_id)
+            args = event.obj.payload.get('args')
 
             method = users_info.get(user_id, {}).get('method')
-            if method == "choose_random":
-                self.choose_random(event.obj.payload.get('args'), user_id)
+            if method == 'choose_random':
+                self.choose_random(args, user_id)
+            elif method == 'game_start':
+                self.game_start(args, user_id)
 
+            # Сброс активированной кнопки, вызвавшей событие
             vk_session.method('messages.sendMessageEventAnswer',
                               {'event_id': event.obj.event_id,
                                'user_id': int(user_id),
                                'peer_id': event.obj.peer_id})
 
-        else:
+        elif event.type == VkBotEventType.MESSAGE_NEW:
             user_id = str(event.obj.from_id)
             message = event.obj.text
 
@@ -89,52 +94,52 @@ class Autoresponder:
             # Получаем метод, с которым работает пользователь, и если он не пуст, перенаправляем сообщение в данный метод
             method = users_info.get(user_id, {}).get('method')
             if method is not None:
+                args = users_info.get(user_id, {}).get('args')
+
                 if method == "choose_random":
-                    self.choose_random(users_info.get(user_id, {}).get('args'), user_id, message)
+                    self.choose_random(args, user_id, message)
+                if method == "game_start":
+                    self.choose_random(args, user_id, message)
+
+                return
 
             else:
-                if message == "" or not self.is_command(message):
+                if message == "":
+                    answer = self.errors[0]
 
-                    # Удаление лишних небуквенных символов и повторов букв в словах
-                    message = re.sub(r'([\D])(\1)+', r'\1', re.sub(r'\W+', ' ', message).lower().strip(), flags=re.I)
-                    # message = "".join(filter(self.is_correct_character, message.lower().strip()))
+                # Если сообщение - не команда
+                elif not self.is_command(message):
 
-                    if message == "":
-                        answer = self.errors[0]
+                    # Удаление лишних и изменение специальных символов и повторов букв в словах
+                    message = re.sub(r'([\D])(\1)+', r'\1',
+                                     re.sub(r'\W+', ' ',
+                                            ''.join(c for c in normalize('NFD', message) if category(c) != 'Mn')
+                                            ).lower().strip(),
+                                     flags=re.I)
+
+                    # Получение всех доступных синонимов
+                    db_cursor.execute(f'SELECT word FROM synonyms_global')
+                    all_synonyms = db_cursor.fetchall()
+                    all_synonyms = [x[0] for x in all_synonyms] if len(all_synonyms) > 0 else list(
+                        answers.get('global').keys())
+
+                    # Получение слова-синонима с исправленными опечатками для данного запроса (если есть)
+                    db_cursor.execute(
+                        f'SELECT request FROM synonyms_global WHERE word="{self.fix_command(message, all_synonyms)}";')
+                    request = db_cursor.fetchone()
+
+                    # Получение списка всех возможных ответов на данный запрос
+                    answer = answers.get("global").get(request[0] if request is not None else None, []) + \
+                        answers.get(user_id).get(message, [])
+
+                    # Если найдено совпадение
+                    if len(answer) != 0:
+                        # Случайный выбор ответа из полученного списка
+                        answer = answer[random.randint(0, len(answer) - 1)]
+
+                    # Если совпадений не найдено
                     else:
-                        # Получение списка всех возможных ответов на данный запрос
-                        answer = answers.get("global").get(message, []) + \
-                            answers.get(user_id).get(message, [])
-
-                        # Если найдены точные совпадения сообщения и запроса
-                        if len(answer) != 0:
-                            # Случайный выбор ответа из полученного списка
-                            answer = answer[random.randint(0, len(answer) - 1)]
-
-                        # Если точных совпадений не найдено - проверить по синонимам и опечаткам
-                        else:
-                            # Получение всех доступных синонимов
-                            db_cursor.execute(f'SELECT word FROM synonyms_global')
-                            all_synonyms = db_cursor.fetchall()
-                            all_synonyms = [x[0] for x in all_synonyms] if len(all_synonyms) > 0 else list(
-                                answers.get('global').keys())
-
-                            # Получение слова-синонима с исправленными опечатками для данного запроса (если есть)
-                            db_cursor.execute(
-                                f'SELECT request FROM synonyms_global WHERE word="{self.fix_command(message, all_synonyms)}";')
-                            request = db_cursor.fetchone()
-
-                            # Получение списка всех возможных ответов на данный запрос
-                            answer = answers.get("global").get(request[0] if request is not None else None, [])
-
-                            # Если найдено совпадение по синонимам с исправленными опечатками
-                            if len(answer) != 0:
-                                # Случайный выбор ответа из полученного списка
-                                answer = answer[random.randint(0, len(answer) - 1)]
-
-                            # Если совпадений не найдено вовсе
-                            else:
-                                answer = self.errors[0]
+                        answer = self.errors[0]
 
                     # Если ответ - стикер (формат: ##ID, где ID - id стикера)
                     if answer[0:2] == "##":
@@ -153,9 +158,7 @@ class Autoresponder:
                     command_message = self.read_command(message, user_id)
 
                     # Формирование ответа, пришедшего после выполнения команды
-                    if command_message is None:
-                        return
-                    else:
+                    if command_message is not None:
                         vk_session.method('messages.send',
                                           {'user_id': int(user_id), 'message': command_message, 'random_id': 0,
                                            'keyboard': self.keyboard})
@@ -215,7 +218,11 @@ class Autoresponder:
         split = arg.split('\n')
 
         # Извлечение запроса и удаление лишних небуквенных символов
-        request = "".join(filter(self.is_correct_character, split[0].strip().lower()))
+        request = re.sub(r'([\D])(\1)+', r'\1',
+                         re.sub(r'\W+', ' ',
+                                ''.join(c for c in normalize('NFD', split[0]) if category(c) != 'Mn')
+                                ).lower().strip(),
+                         flags=re.I)
 
         # Проверка запроса на корректность
         if len(request) == 0:
@@ -272,7 +279,11 @@ class Autoresponder:
         split = arg.split('\n')
 
         # Извлечение запроса и удаление лишних небуквенных символов
-        request = "".join(filter(self.is_correct_character, split[0].strip().lower()))
+        request = re.sub(r'([\D])(\1)+', r'\1',
+                         re.sub(r'\W+', ' ',
+                                ''.join(c for c in normalize('NFD', split[0]) if category(c) != 'Mn')
+                                ).lower().strip(),
+                         flags=re.I)
 
         # Проверка запроса на корректность
         if len(request) == 0:
@@ -326,7 +337,11 @@ class Autoresponder:
         user_id = str(user_id)
 
         # Извлечение запроса и удаление лишних небуквенных символов
-        request = "".join(filter(self.is_correct_character, arg.strip().lower()))
+        request = re.sub(r'([\D])(\1)+', r'\1',
+                         re.sub(r'\W+', ' ',
+                                ''.join(c for c in normalize('NFD', arg) if category(c) != 'Mn')
+                                ).lower().strip(),
+                         flags=re.I)
 
         # Проверка запроса на корректность
         if len(request) == 0:
@@ -449,7 +464,11 @@ class Autoresponder:
         string_responses = str()
 
         # Извлечение запроса и удаление лишних небуквенных символов
-        request = "".join(filter(self.is_correct_character, arg.strip().lower()))
+        request = re.sub(r'([\D])(\1)+', r'\1',
+                         re.sub(r'\W+', ' ',
+                                ''.join(c for c in normalize('NFD', arg) if category(c) != 'Mn')
+                                ).lower().strip(),
+                         flags=re.I)
 
         # Проверка запроса на корректность
         if len(request) == 0:
@@ -480,6 +499,8 @@ class Autoresponder:
 
         :return: сообщение со списком всех доступных команд бота.
         """
+        if user_id is None:
+            return
         string_commands = str()
         number = 1
         role = roles[users_info.get(user_id, {}).get('role', 'user')] + 1
@@ -496,7 +517,7 @@ class Autoresponder:
         users_info[user_id]['args'] = arg
 
         # Завершение работы с генератором и возврат к автоответчику
-        if message is not None and message.lower() == 'назад':
+        if arg == 'back':
             users_info[user_id]['method'] = None
             users_info[user_id]['args'] = None
             vk_session.method('messages.send',
@@ -628,31 +649,31 @@ class Autoresponder:
 
         # Простой генератор (по умолчанию)
         else:
-            # if args is None
+            # if arg is None
             keyboard = str(json.dumps(
                 {
-                    "inline": False,
-                    "buttons": [
-                        [get_callback_button("Случайное вещественное число от 0 до 1", 'positive',
-                                             {"args": "random"})],
-                        [get_callback_button("Случайное целое число от A до B", 'positive',
-                                             {"args": "randint"})],
-                        [get_callback_button("Случайное вещественное число от A до B", 'positive',
-                                             {"args": "uniform"})],
-                        [get_callback_button("Случайный элемент последовательности", 'positive',
-                                             {"args": "choice"})],
-                        [get_callback_button("Профессиональный генератор", 'primary',
-                                             {"args": "professional"})],
-                        [get_text_button("Назад", 'negative')]
+                    'inline': False,
+                    'buttons': [
+                        [get_callback_button('Случайное вещественное число от 0 до 1', 'positive',
+                                             {'args': 'random'})],
+                        [get_callback_button('Случайное целое число от A до B', 'positive',
+                                             {'args': 'randint'})],
+                        [get_callback_button('Случайное вещественное число от A до B', 'positive',
+                                             {'args': 'uniform'})],
+                        [get_callback_button('Случайный элемент последовательности', 'positive',
+                                             {'args': 'choice'})],
+                        [get_callback_button('Профессиональный генератор', 'primary',
+                                             {'args': 'professional'})],
+                        [get_callback_button('Назад', 'negative', {'args': 'back'})]
                     ]
                 },
                 ensure_ascii=False))
 
             vk_session.method('messages.send',
-                              {'user_id': int(user_id), 'message': "~Простой генератор~\n\n"
-                                                                   "Выберите тип генератора случайных чисел.\n"
-                                                                   "Если желаете использовать генератор многократно, достаточно выбрать тип один раз и повторять ввод аргументов.\n"
-                                                                   "Для возврата выберите кнопку \"Назад\"",
+                              {'user_id': int(user_id), 'message': '~Простой генератор~\n\n'
+                                                                   'Выберите тип генератора случайных чисел.\n'
+                                                                   'Если желаете использовать генератор многократно, достаточно выбрать тип один раз и повторять ввод аргументов.\n'
+                                                                   'Для возврата выберите кнопку "Назад"',
                                'random_id': 0,
                                'keyboard': keyboard})
 
@@ -675,46 +696,91 @@ class Autoresponder:
         elif split[0] not in users_info.keys():
             return 'Пользователь не найден'
         elif split[0] == admin_id:
-            return 'Вы не можете изменить свою роль'
+            return 'Вы не можете изменить свой уровень доступа'
+        elif roles[users_info.get(admin_id).get('role')] <= roles[users_info.get(split[0]).get('role')]:
+            return f'Вы не можете изменить уровень доступа пользователя уровня {users_info.get(split[0]).get("role")}'
         else:
             users_info[split[0]]['role'] = split[1]
-            return f'Пользователю "{split[0]}" выдана роль "{split[1]}"'
+
+            user = vk_session.method('users.get', {'user_ids': int(admin_id)})[0]
+            name = f"{user.get('first_name')} {user.get('last_name')}"
+            vk_session.method('messages.send',
+                              {'user_id': int(split[0]),
+                               'message': f'Ваш уровень доступа изменен на "{split[1]}" пользователем "{name}" '
+                                          f'уровня "{users_info.get(admin_id).get("role")}"',
+                               'random_id': 0,
+                               'keyboard': self.keyboard})
+
+            return f'Пользователю "{split[0]}" выдан уровень доступа "{split[1]}"'
 
     @staticmethod
-    def get_top_math(arg, user_id):
-        """ Предоставление списка рейтинга игры "Математика".
+    def get_balance(arg, user_id):
+        return f'Ваш баланс: {users_info[user_id]["balance"]}💰'
 
-        :param arg: None.
-        :type arg: None.
-
-        :param user_id: ID пользователя, вызвавшего команду.
-        :type user_id: int или str.
-        """
-        game_math_class.get_top(user_id)
-
-    @staticmethod
-    def game_math_start(arg, user_id):
+    def game_start(self, arg, user_id, message=None):
         """ Начало игры "Математика".
 
+        :param message: сообщение от пользователя.
+        :type message: str.
+
         :param arg: None.
         :type arg: None.
 
         :param user_id: ID пользователя, вызвавшего команду.
         :type user_id: int или str.
         """
-        users_info[user_id]['class'] = 'game_math'
-        game_math_class.start(str(user_id))
+        # Завершение работы с игровым меню и возврат к автоответчику
+        if arg == 'back':
+            users_info[user_id]['method'] = None
+            users_info[user_id]['args'] = None
+            vk_session.method('messages.send',
+                              {'user_id': int(user_id), 'message': "Вы завершили работу с игровым меню",
+                               'random_id': 0, 'keyboard': self.keyboard})
+
+        elif arg == 'game_math':
+            change_class(user_id, 'game_math')
+            game_math_class.start(str(user_id))
+
+        else:
+            keyboard = str(json.dumps(
+                {
+                    'inline': False,
+                    'buttons': [
+                        [get_callback_button('Математика', 'positive', {'args': 'game_math'})],
+                        [get_callback_button("Назад", 'negative', {'args': 'back'})]
+                    ]
+                },
+                ensure_ascii=False))
+
+            vk_session.method('messages.send',
+                              {'user_id': int(user_id), 'message': '~Игровое меню~\n\n'
+                                                                   'Выберите игру.\n'
+                                                                   'Для возврата выберите кнопку "Назад"',
+                               'random_id': 0,
+                               'keyboard': keyboard})
+
+            users_info[user_id]['method'] = 'game_start'
+            users_info[user_id]['args'] = None
+            return
 
     @staticmethod
-    def is_command(msg):
-        return msg[0] == '!'
+    def is_command(string):
+        """ Проверка: является ли сообщение командой.
+        :param string: str.
 
-    @staticmethod
-    def is_correct_character(character):
-        return str.isalpha(character) or character == ' '
+        :return: True, если сообщение - команда.
+            False - иначе.
+        """
+        return string.startswith('!')
 
     @staticmethod
     def is_int(string):
+        """ Проверка: является ли сообщение целым числом.
+        :param string: str.
+
+        :return: True, если сообщение - целое число.
+            False - иначе.
+        """
         try:
             return float(string) == int(string)
         except ValueError:
@@ -722,6 +788,12 @@ class Autoresponder:
 
     @staticmethod
     def is_float(string):
+        """ Проверка: является ли сообщение числом.
+        :param string: str.
+
+        :return: True, если сообщение - число.
+            False - иначе.
+        """
         try:
             float(string)
             return True
@@ -730,6 +802,16 @@ class Autoresponder:
 
     @staticmethod
     def fix_command(text, words):
+        """ Поиск максимально приближенного к text сообщения из words.
+        :param text: сообщение для анализа.
+        :type text: str.
+
+        :param words: список идеальных сообщений, среди которых надо искать максимальное приближение.
+        :type words: list<str>.
+
+        :return: command из words, максимально похожий на text, если процент совпадения больше 0.5.
+            None - иначе.
+        """
         # Оригинальный текст
         text_original = text.lower()
         # Текст после транслитерации

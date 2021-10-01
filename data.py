@@ -24,7 +24,14 @@ game_math_top = {}
 timer: threading.Timer
 
 # Логи для обработки данных по синонимичному распознаванию запросов
-synonyms_stats = list()
+synonyms_stats = []
+
+
+def change_class(user_id, new_class):
+    users_info[user_id]['class'] = new_class
+    users_info[user_id]['method'] = None
+    users_info[user_id]['args'] = None
+
 
 # Регистрация транслитерации по раскладке клавиатуры
 autodiscover()
@@ -69,13 +76,18 @@ db_cursor.execute('CREATE TABLE IF NOT EXISTS synonyms_global(word text PRIMARY 
 db_cursor.executemany('INSERT OR IGNORE INTO synonyms_global VALUES(?, ?);', ((word, word) for word in answers.get('global').keys()))
 db_connect.commit()
 
-db_cursor.execute('CREATE TABLE IF NOT EXISTS users_info(id text PRIMARY KEY, role text, class text, method text, args text)')
-db_connect.commit()
-db_cursor.execute('SELECT id, role, class, method, args FROM users_info')
-users_info = {x[0]: {'role': x[1], 'class': x[2], 'method': x[3], 'args': x[4]} for x in db_cursor.fetchall()}  # [(id, role, class, method, args), (,,,,), ...]
-
 db_cursor.execute('CREATE TABLE IF NOT EXISTS synonyms_stats(phrase text PRIMARY KEY, request text, type text, rate real)')
 db_connect.commit()
+
+db_cursor.execute('CREATE TABLE IF NOT EXISTS users_info(id text PRIMARY KEY, role text, class text, method text, args text)')
+db_connect.commit()
+try:
+    db_cursor.execute('ALTER TABLE users_info ADD COLUMN balance REAL DEFAULT 0;')
+    db_connect.commit()
+except Exception:
+    pass
+db_cursor.execute('SELECT id, role, class, method, args, balance FROM users_info')
+users_info = {x[0]: {'role': x[1], 'class': x[2], 'method': x[3], 'args': x[4], 'balance': x[5]} for x in db_cursor.fetchall()}  # [(id, role, class, method, args, balance), (,,,,), ...]
 
 
 def set_next_save_all():
@@ -91,8 +103,8 @@ def save_all(is_finally=False):
     db_cursor_save = db_connect_save.cursor()
 
     if users_info != {}:
-        db_cursor_save.executemany('INSERT OR REPLACE INTO users_info(id, role, class, method, args) VALUES(?, ?, ?, ?, ?);',
-                                   [(item[0], item[1].get('role'), item[1].get('class'), item[1].get('method'), item[1].get('args'))
+        db_cursor_save.executemany('INSERT OR REPLACE INTO users_info(id, role, class, method, args, balance) VALUES(?, ?, ?, ?, ?, ?);',
+                                   [(item[0], item[1].get('role'), item[1].get('class'), item[1].get('method'), item[1].get('args'), item[1].get('balance'))
                                     for item in users_info.items()])
 
     if synonyms_stats:

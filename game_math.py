@@ -3,7 +3,7 @@ import json
 import threading
 from vk_auth import vk_session, VkBotEventType
 from keyboard import *
-from data import game_math_stats, game_math_top, users_info
+from data import game_math_stats, game_math_top, users_info, change_class
 
 
 def create_keyboard(nums):
@@ -73,39 +73,64 @@ class GameMath:
             'Ну, и чтобы я успел составить еще примерчиков!\n\n'
             'Если у тебя есть ❤, ты можешь продолжить игру с момента своего поражения!\n'
             'Бонус для новых игроков: 5❤.\n'
+            'За первое достижение каждых 15 верных ответов (15, 30, 45, ...) ты получишь дополнительные 3❤ по окончании игры\n'
             'За достижение 5 уровня и каждого последующего ты получишь дополнительное ❤.\n\n'
             'Если все понятно - жми кнопку и погнали!',
             # 2
             'Игра окончена!']
 
         self.game_levels = {
-            0: {"min": 10, "max": 20, "actions": [plus]},
-            1: {"min": 10, "max": 20, "actions": [minus]},
-            2: {"min": 10, "max": 20, "actions": [multiplication]},
-            3: {"min": 10, "max": 20, "actions": [division]},
+            0: {"min": 0, "max": 10, "actions": [plus]},
+            1: {"min": 0, "max": 20, "actions": [plus]},
+            2: {"min": 0, "max": 50, "actions": [plus]},
 
-            4: {"min": 10, "max": 50, "actions": [plus, minus]},
-            5: {"min": 10, "max": 99, "actions": [plus, minus]},
-            6: {"min": 100, "max": 199, "actions": [plus, minus]},
-            7: {"min": 100, "max": 999, "actions": [plus, minus]},
+            3: {"min": 0, "max": 5, "actions": [multiplication]},
+            4: {"min": 0, "max": 10, "actions": [multiplication]},
+            5: {"min": 0, "max": 20, "actions": [multiplication]},
 
-            8: {"min": 10, "max": 50, "actions": [multiplication, division]},
-            9: {"min": 10, "max": 99, "actions": [multiplication, division]},
-            10: {"min": 100, "max": 199, "actions": [multiplication, division]},
-            11: {"min": 100, "max": 999, "actions": [multiplication, division]},
+            6: {"min": 0, "max": 10, "actions": [minus]},
+            7: {"min": 0, "max": 20, "actions": [minus]},
+            8: {"min": 0, "max": 50, "actions": [minus]},
 
-            12: {"min": 10, "max": 50, "actions": [plus, minus, multiplication, division]},
-            13: {"min": 10, "max": 99, "actions": [plus, minus, multiplication, division]},
-            14: {"min": 100, "max": 999, "actions": [plus, minus, multiplication, division]},
+            9: {"min": 0, "max": 5, "actions": [division]},
+            10: {"min": 0, "max": 10, "actions": [division]},
+            11: {"min": 0, "max": 20, "actions": [division]},
 
-            15: {"min": 1000, "max": 5000, "actions": [plus, minus, multiplication, division]},
+            12: {"min": -10, "max": 10, "actions": [plus]},
+            13: {"min": -20, "max": 20, "actions": [plus]},
+            14: {"min": -50, "max": 50, "actions": [plus]},
+
+            15: {"min": -5, "max": 5, "actions": [multiplication]},
+            16: {"min": -10, "max": 10, "actions": [multiplication]},
+            17: {"min": -20, "max": 20, "actions": [multiplication]},
+
+            18: {"min": -10, "max": 10, "actions": [minus]},
+            19: {"min": -20, "max": 20, "actions": [minus]},
+            20: {"min": -50, "max": 50, "actions": [minus]},
+
+            21: {"min": -5, "max": 5, "actions": [division]},
+            22: {"min": -10, "max": 10, "actions": [division]},
+            23: {"min": -20, "max": 20, "actions": [division]},
+
+            24: {"min": 100, "max": 150, "actions": [plus, minus]},
+            25: {"min": 100, "max": 200, "actions": [plus, minus]},
+            26: {"min": 100, "max": 300, "actions": [plus, minus]},
+
+            27: {"min": 0, "max": 50, "actions": [multiplication, division]},
+            28: {"min": 0, "max": 100, "actions": [multiplication, division]},
+            29: {"min": 0, "max": 150, "actions": [multiplication, division]},
+
+            30: {"min": 1000, "max": 5000, "actions": [plus, minus, multiplication, division]},
         }
 
         self.start_keyboard = str(json.dumps(
             {
                 "one_time": True,
                 "buttons": [
-                    [get_text_button('Правила', 'primary'), get_text_button('Начать', 'positive')]
+                    [get_text_button('Правила', 'primary'), get_text_button('Начать', 'positive')],
+                    [get_text_button('Обменять 5❤ на 1💰', 'primary')],
+                    [get_text_button('Рейтинг математики', 'secondary')],
+                    [get_text_button('Завершить игру', 'negative')]
                 ]
             },
             ensure_ascii=False))
@@ -122,7 +147,7 @@ class GameMath:
                 "inline": True,
                 "buttons": [
                     [get_text_button('Новая игра', 'primary'), get_text_button('Завершить игру', 'negative')],
-                    [get_text_button('!Рейтинг математики', 'secondary')]
+                    [get_text_button('Рейтинг математики', 'secondary')]
                 ]
             },
             ensure_ascii=False))
@@ -133,7 +158,7 @@ class GameMath:
                 "buttons": [
                     [get_callback_button('Использовать ❤', 'positive', {"method": "GameMath.use_lives", "args": None})],
                     [get_text_button('Новая игра', 'primary'), get_text_button('Завершить игру', 'negative')],
-                    [get_text_button('!Рейтинг математики', 'secondary')]
+                    [get_text_button('Рейтинг математики', 'secondary')]
                 ]
             },
             ensure_ascii=False))
@@ -158,11 +183,11 @@ class GameMath:
 
         if event.type == VkBotEventType.MESSAGE_EVENT:
             user_id = str(event.obj.user_id)
-            self.cancel_timer(user_id)
 
             method = event.obj.payload.get('method')
             if method == "GameMath.game":
-                self.game(user_id, event.obj.payload.get('args'))
+                if self.cancel_timer(user_id):
+                    self.game(user_id, event.obj.payload.get('args'))
             elif method == "GameMath.use_lives":
                 self.use_live(user_id)
 
@@ -183,10 +208,12 @@ class GameMath:
                 self.start(user_id)
             elif message == 'правила':
                 self.rules(user_id)
-            elif message == '!рейтинг математики':
+            elif message == 'рейтинг математики':
                 self.get_top(user_id)
             elif message == 'завершить игру':
                 self.end(user_id, True)
+            elif message == 'обменять 5❤ на 1💰':
+                self.exchange_lives_for_balance(user_id)
             else:
                 self.end(user_id)
 
@@ -211,6 +238,16 @@ class GameMath:
 
         # Обновление рейтинга, если надо
         if game_math_stats.get(user_id, {}).get('score', 0) > game_math_top.get(user_id, {}).get('record', 0):
+            # Начисление бонусных жизней, если игрок побил личный рекорд, но >= 15 очков
+            for score in range(15, game_math_stats.get(user_id).get('score'), 15):
+                if game_math_top.get(user_id, {}).get('record', 0) < score:
+                    game_math_stats[user_id]['lives'] += 3
+                    vk_session.method('messages.send',
+                                      {'user_id': int(user_id),
+                                       'message': f'Вы впервые дали более {score} верных ответов и зарабатываете 3❤!\n'
+                                                  f'На счету {game_math_stats.get(user_id).get("lives")}❤',
+                                       'random_id': 0})
+
             # Получение имени и фамилии игрока
             user = vk_session.method('users.get', {'user_ids': int(user_id)})[0]
             name = f"{user.get('first_name')} {user.get('last_name')}"
@@ -226,7 +263,7 @@ class GameMath:
                                'random_id': 0, 'keyboard': self.end_keyboard})
 
             game_math_stats[user_id]['score'] = 0
-            users_info[user_id]['class'] = 'autoresponder'
+            change_class(user_id, 'autoresponder')
 
         elif game_math_stats.get(user_id).get('lives') > 0 and game_math_stats.get(user_id).get('is_active'):
             # Если есть жизни
@@ -310,8 +347,8 @@ class GameMath:
     def new_formula(self, user_id):
         symbol = ""
         level = game_math_stats.get(user_id).get("score") // 5  # 5 примеров на каждом уровне
-        if level > 15:
-            level = 15
+        if level >= len(self.game_levels):
+            level = len(self.game_levels) - 1
         rand_min = self.game_levels.get(level).get("min")
         rand_max = self.game_levels.get(level).get("max")
 
@@ -353,6 +390,8 @@ class GameMath:
     def cancel_timer(self, user_id):
         if self.timers.get(user_id) is not None:
             self.timers.get(user_id).cancel()
+            return True
+        return False
 
     def use_live(self, user_id):
         """ Использование жизни для продолжения игры.
@@ -370,8 +409,12 @@ class GameMath:
             game_math_stats[user_id]['lives'] -= 1
             self.game(user_id, None)
 
-    @staticmethod
-    def get_top(user_id):
+    def get_top(self, user_id):
+        """ Предоставление списка рейтинга игры "Математика".
+
+        :param user_id: ID пользователя, вызвавшего команду.
+        :type user_id: int или str.
+        """
         top_sort = []
         for gamer in game_math_top.values():
             top_sort.append([gamer.get('name'), gamer.get('record')])
@@ -387,5 +430,33 @@ class GameMath:
         if top_sort[0][0] == "Александр Березин":
             string_top += "О, мой хозяин на первом месте!&#128526;"
 
+        if game_math_stats[str(user_id)]['is_active']:
+            vk_session.method('messages.send',
+                              {'user_id': int(user_id), 'message': string_top, 'random_id': 0,
+                               'keyboard': self.start_keyboard})
+        else:
+            vk_session.method('messages.send',
+                              {'user_id': int(user_id), 'message': string_top, 'random_id': 0})
+
+    def exchange_lives_for_balance(self, user_id):
+        user_id = str(user_id)
+
+        if game_math_stats.get(user_id, {}).get('lives', 0) >= 5:
+            users_info[user_id]['balance'] += 1
+            game_math_stats[user_id]['lives'] -= 5
+
+            message = f'Вы обменяли 5❤ на 1💰\n'\
+                      f'На счету {game_math_stats.get(user_id).get("lives")}❤\n'\
+                      f'Ваш баланс: {users_info[user_id]["balance"]}💰'
+
+        else:
+            message = f'Недостаточно ❤ для совершения обмена\n' \
+                      f'На счету {game_math_stats.get(user_id).get("lives")}❤\n'
+
+        keyboard = None
+        if game_math_stats[user_id]['is_active']:
+            keyboard = self.start_keyboard
+
         vk_session.method('messages.send',
-                          {'user_id': int(user_id), 'message': string_top, 'random_id': 0})
+                          {'user_id': int(user_id), 'message': message, 'random_id': 0,
+                           'keyboard': keyboard})
