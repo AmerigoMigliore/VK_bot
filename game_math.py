@@ -73,7 +73,7 @@ class GameMath:
             'Ну, и чтобы я успел составить еще примерчиков!\n\n'
             'Если у тебя есть ❤, ты можешь продолжить игру с момента своего поражения!\n'
             'Бонус для новых игроков: 5❤.\n'
-            'За первое достижение каждых 15 верных ответов (15, 30, 45, ...) ты получишь дополнительные 3❤ по окончании игры\n'
+            'За первое достижение каждых 15 верных ответов (15, 30, 45, ...) ты получишь дополнительные 3❤ по окончании игры.\n'
             'За достижение 5 уровня и каждого последующего ты получишь дополнительное ❤.\n\n'
             'Если все понятно - жми кнопку и погнали!',
             # 2
@@ -280,7 +280,7 @@ class GameMath:
                               {'user_id': int(user_id),
                                'message': f'Вы дали правильных ответов: {game_math_stats.get(user_id).get("score")}\n'
                                           f'Ваш рекорд: {game_math_top.get(user_id).get("record")}\n'
-                                          f'"На счету {game_math_stats.get(user_id).get("lives")}❤\n"'
+                                          f'На счету {game_math_stats.get(user_id).get("lives")}❤\n'
                                           f'Сыграем еще раз?',
                                'random_id': 0, 'keyboard': self.end_keyboard_without_lives})
 
@@ -317,8 +317,8 @@ class GameMath:
 
             vk_session.method('messages.send',
                               {'user_id': int(user_id),
-                               'message': f"Вы перешли на уровень {game_math_stats.get(user_id).get('score') // 5}\n"
-                                          f"Рекомендую отдохнуть 10-20 секунд!",
+                               'message': f'Вы перешли на уровень {game_math_stats.get(user_id).get("score") // 5}\n'
+                                          f'Рекомендую отдохнуть 10-20 секунд!',
                                'random_id': 0, 'keyboard': self.continue_game_keyboard})
 
         # Если не ожидается никакого ответа -> создать новый пример
@@ -331,16 +331,18 @@ class GameMath:
                 {user_id: {'is_active': True, 'lives': game_math_stats.get(user_id).get('lives'),
                            'answer': None, 'score': game_math_stats.get(user_id).get('score') + 1}})
             vk_session.method('messages.send',
-                              {'user_id': int(user_id), 'message': 'Ваш ответ "{}" верный!\nВсего правильных ответов: "{}"!'
-                                                        .format(answer, game_math_stats.get(user_id).get('score')),
+                              {'user_id': int(user_id),
+                               'message': f'Ваш ответ "{answer}" верный!\n'
+                                          f'Всего правильных ответов: "{game_math_stats.get(user_id).get("score")}"!',
                                'random_id': 0})
             self.game(user_id, "")
 
         # Окончание игры
         else:
             vk_session.method('messages.send',
-                              {'user_id': int(user_id), 'message': 'Ваш ответ "{}" неверный!\nВерный ответ: "{}"!'
-                                                        .format(answer, game_math_stats.get(user_id).get('answer')),
+                              {'user_id': int(user_id),
+                               'message': f'Ваш ответ "{answer}" неверный!\n'
+                                          f'Верный ответ: "{game_math_stats.get(user_id).get("answer")}"!',
                                'random_id': 0})
             self.end(user_id)
 
