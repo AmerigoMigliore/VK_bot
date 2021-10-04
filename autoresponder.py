@@ -736,7 +736,8 @@ class Autoresponder:
             vk_session.method('messages.send',
                               {'user_id': int(split[0]),
                                'message': f'Вам начислено "{split[1]}"💰 пользователем "{name}" '
-                                          f'уровня "{users_info.get(admin_id).get("role")}"',
+                                          f'уровня "{users_info.get(admin_id).get("role")}"\n'
+                                          f'Баланс: {users_info[str(split[0])]["balance"]}💰',
                                'random_id': 0,
                                'keyboard': main_keyboard})
             return f'Пользователю "{split[0]}" начислено {split[1]}💰.\n' \
