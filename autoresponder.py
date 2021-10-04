@@ -730,6 +730,15 @@ class Autoresponder:
             return 'Пользователь не найден'
         else:
             users_info[str(split[0])]['balance'] += float(split[1])
+
+            user = vk_session.method('users.get', {'user_ids': int(admin_id)})[0]
+            name = f"{user.get('first_name')} {user.get('last_name')}"
+            vk_session.method('messages.send',
+                              {'user_id': int(split[0]),
+                               'message': f'Вам начислено "{split[1]}"💰 пользователем "{name}" '
+                                          f'уровня "{users_info.get(admin_id).get("role")}"',
+                               'random_id': 0,
+                               'keyboard': main_keyboard})
             return f'Пользователю "{split[0]}" начислено {split[1]}💰.\n' \
                    f'Баланс: {users_info[str(split[0])]["balance"]}💰'
 
