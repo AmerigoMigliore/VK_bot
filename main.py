@@ -1,18 +1,21 @@
 # >Created by ATB<
 
 import sys
-from data import roles, save_all
+import threading
+from data import roles, save_all, users_info, game_math_stats
 from vk_auth import longpoll
 from autoresponder import Autoresponder
-from all_games import *
+from all_games import game_math_class, game_luck_class
+from vk_auth import VkBotEventType, vk_session
 
 
 def main():
     is_bot_active = True
     autoresponder_class = Autoresponder()
     all_classes = {
-        "autoresponder": autoresponder_class,
-        "game_math": game_math_class
+        'autoresponder': autoresponder_class,
+        'game_math': game_math_class,
+        'game_luck': game_luck_class
     }
 
     while True:

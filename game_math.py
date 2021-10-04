@@ -3,7 +3,7 @@ import json
 import threading
 from vk_auth import vk_session, VkBotEventType
 from keyboard import *
-from data import game_math_stats, game_math_top, users_info, change_class
+from data import game_math_stats, game_math_top, users_info, change_users_info, main_keyboard
 
 
 def create_keyboard(nums):
@@ -55,7 +55,6 @@ class GameMath:
     start_keyboard = None
     end_keyboard_without_lives = None
     end_keyboard_with_lives = None
-    end_keyboard = None
     continue_game_keyboard = None
     timers = {}
 
@@ -128,26 +127,20 @@ class GameMath:
                 "one_time": True,
                 "buttons": [
                     [get_text_button('Правила', 'primary'), get_text_button('Начать', 'positive')],
-                    [get_text_button('Обменять 5❤ на 1💰', 'primary')],
-                    [get_text_button('Рейтинг математики', 'secondary')],
+                    [get_text_button('Магазин', 'secondary')],
+                    [get_text_button('Рейтинг математики', 'primary')],
                     [get_text_button('Завершить игру', 'negative')]
                 ]
             },
             ensure_ascii=False))
-
-        self.end_keyboard = str(json.dumps({
-                "one_time": False,
-                "buttons": [
-                    [get_text_button('!Все запросы', 'primary'), get_text_button('!Все команды', 'primary')]
-                ]
-            }, ensure_ascii=False))
 
         self.end_keyboard_without_lives = str(json.dumps(
             {
                 "inline": True,
                 "buttons": [
                     [get_text_button('Новая игра', 'primary'), get_text_button('Завершить игру', 'negative')],
-                    [get_text_button('Рейтинг математики', 'secondary')]
+                    [get_text_button('Магазин', 'secondary')],
+                    [get_text_button('Рейтинг математики', 'primary')],
                 ]
             },
             ensure_ascii=False))
@@ -158,7 +151,8 @@ class GameMath:
                 "buttons": [
                     [get_callback_button('Использовать ❤', 'positive', {"method": "GameMath.use_lives", "args": None})],
                     [get_text_button('Новая игра', 'primary'), get_text_button('Завершить игру', 'negative')],
-                    [get_text_button('Рейтинг математики', 'secondary')]
+                    [get_text_button('Магазин', 'secondary')],
+                    [get_text_button('Рейтинг математики', 'primary')],
                 ]
             },
             ensure_ascii=False))
@@ -191,6 +185,11 @@ class GameMath:
             elif method == "GameMath.use_lives":
                 self.use_live(user_id)
 
+            method = users_info.get(user_id, {}).get('method')
+            if method == 'store':
+                args = event.obj.payload.get('args')
+                self.store(user_id, args)
+
             vk_session.method('messages.sendMessageEventAnswer',
                               {'event_id': event.obj.event_id,
                                'user_id': int(user_id),
@@ -212,8 +211,8 @@ class GameMath:
                 self.get_top(user_id)
             elif message == 'завершить игру':
                 self.end(user_id, True)
-            elif message == 'обменять 5❤ на 1💰':
-                self.exchange_lives_for_balance(user_id)
+            elif message == 'магазин':
+                self.store(user_id)
             else:
                 self.end(user_id)
 
@@ -228,8 +227,9 @@ class GameMath:
                                               'answer': None, 'score': 0}})
 
         vk_session.method('messages.send',
-                          {'user_id': int(user_id), 'message': self.texts[0] +
-                              f'\nНа счету {game_math_stats.get(user_id).get("lives")}❤',
+                          {'user_id': int(user_id),
+                           'message': f'{self.texts[0]}\n'
+                                      f'На счету {game_math_stats.get(user_id).get("lives")}❤',
                            'random_id': 0, 'keyboard': self.start_keyboard})
 
     def end(self, user_id, back=False):
@@ -260,10 +260,10 @@ class GameMath:
             vk_session.method('messages.send',
                               {'user_id': int(user_id),
                                'message': 'Спасибо за игру!\nПомни, что ты всегда можешь побить свой рекорд!',
-                               'random_id': 0, 'keyboard': self.end_keyboard})
+                               'random_id': 0, 'keyboard': main_keyboard})
 
             game_math_stats[user_id]['score'] = 0
-            change_class(user_id, 'autoresponder')
+            change_users_info(user_id, 'autoresponder')
 
         elif game_math_stats.get(user_id).get('lives') > 0 and game_math_stats.get(user_id).get('is_active'):
             # Если есть жизни
@@ -440,25 +440,60 @@ class GameMath:
             vk_session.method('messages.send',
                               {'user_id': int(user_id), 'message': string_top, 'random_id': 0})
 
-    def exchange_lives_for_balance(self, user_id):
+    def store(self, user_id, arg=None):
         user_id = str(user_id)
-
-        if game_math_stats.get(user_id, {}).get('lives', 0) >= 5:
-            users_info[user_id]['balance'] += 1
-            game_math_stats[user_id]['lives'] -= 5
-
-            message = f'Вы обменяли 5❤ на 1💰\n'\
-                      f'На счету {game_math_stats.get(user_id).get("lives")}❤\n'\
-                      f'Ваш баланс: {users_info[user_id]["balance"]}💰'
-
-        else:
-            message = f'Недостаточно ❤ для совершения обмена\n' \
-                      f'На счету {game_math_stats.get(user_id).get("lives")}❤\n'
-
         keyboard = None
-        if game_math_stats[user_id]['is_active']:
-            keyboard = self.start_keyboard
+
+        if arg == 'back':
+            users_info[user_id]['method'] = None
+            users_info[user_id]['args'] = None
+            self.start(user_id)
+            return
+
+        elif arg == 'exchange_lives_for_money':
+            if game_math_stats.get(user_id, {}).get('lives', 0) >= 3:
+                users_info[user_id]['balance'] += 1
+                game_math_stats[user_id]['lives'] -= 3
+
+                message = f'Вы обменяли 3❤ на 1💰\n' \
+                          f'На счету {game_math_stats.get(user_id).get("lives")}❤\n' \
+                          f'Ваш баланс: {users_info[user_id]["balance"]}💰'
+
+            else:
+                message = f'Недостаточно ❤ для совершения обмена\n' \
+                          f'На счету {game_math_stats.get(user_id, {}).get("lives", 0)}❤\n'
+
+        elif arg == 'exchange_money_for_lives':
+            if users_info.get(user_id, {}).get('balance', 0) >= 1:
+                users_info[user_id]['balance'] -= 1
+                game_math_stats[user_id]['lives'] += 2
+
+                message = f'Вы обменяли 1💰 на 2❤\n' \
+                          f'На счету {game_math_stats.get(user_id).get("lives")}❤\n' \
+                          f'Ваш баланс: {users_info[user_id]["balance"]}💰'
+
+            else:
+                message = f'Недостаточно 💰 для совершения обмена\n' \
+                          f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n'
+        else:
+            keyboard = str(json.dumps(
+                {
+                    'inline': False,
+                    'one_time': False,
+                    'buttons': [
+                        [get_callback_button('Обменять 3❤ на 1💰', 'positive', {'args': 'exchange_lives_for_money'})],
+                        [get_callback_button('Обменять 1💰 на 2❤', 'positive', {'args': 'exchange_money_for_lives'})],
+                        [get_callback_button('Назад', 'negative', {'args': 'back'})]
+                    ]
+                },
+                ensure_ascii=False))
+
+            message = '~Математический магазин~\n\n' \
+                      'Выберите действие.\n' \
+                      'Для возврата выберите кнопку "Назад"'
 
         vk_session.method('messages.send',
                           {'user_id': int(user_id), 'message': message, 'random_id': 0,
                            'keyboard': keyboard})
+        users_info[user_id]['method'] = 'store'
+        users_info[user_id]['args'] = None

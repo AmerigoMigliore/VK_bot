@@ -1,11 +1,15 @@
 import numpy as np
 import re
 import data
-from all_games import *
-from data import answers, db_cursor, db_connect, users_info, roles
+from all_games import game_math_class, game_luck_class
+from data import answers, db_cursor, db_connect, users_info, roles, change_users_info
 from pyxdameraulevenshtein import normalized_damerau_levenshtein_distance_seqs
 from transliterate import translit
 from unicodedata import normalize, category
+from keyboard import *
+import json
+from vk_auth import VkBotEventType, vk_session
+import random
 
 
 class Autoresponder:
@@ -28,7 +32,8 @@ class Autoresponder:
                          '!!добавить синонимы': [self.add_synonyms, 'Запрос\nСиноним\nСиноним\n...'],
                          '!!удалить синонимы': [self.delete_synonyms, 'Синоним\nСиноним\n...'],
                          '!!синонимы': [self.get_synonyms, 'Запрос'],
-                         '!!!изменить роль': [self.set_role, 'ID\nРоль']
+                         '!!!изменить роль': [self.set_role, 'ID\nРоль'],
+                         '!!!выдать монеты': [self.give_money, 'ID\nКоличество']
                          }
         self.methods = {'': self.choose_random}
         self.errors = [  # TODO: Поменять на что-то нормальное
@@ -38,7 +43,7 @@ class Autoresponder:
             # 1
             'Неизвестная команда.\nУзнать список доступных команд и их синтаксис: !все команды',
             # 2
-            'Неверные аргументы.\nУзнать список доступных команд и их синтаксис: !все команды',]
+            'Неверные аргументы.\nУзнать список доступных команд и их синтаксис: !все команды', ]
         self.keyboard = str(json.dumps({
             "one_time": False,
             "buttons": [
@@ -130,7 +135,7 @@ class Autoresponder:
 
                     # Получение списка всех возможных ответов на данный запрос
                     answer = answers.get("global").get(request[0] if request is not None else None, []) + \
-                        answers.get(user_id).get(message, [])
+                             answers.get(user_id).get(message, [])
 
                     # Если найдено совпадение
                     if len(answer) != 0:
@@ -369,7 +374,8 @@ class Autoresponder:
             if len(split) < 2:
                 return self.errors[2]
             else:
-                db_cursor.executemany('INSERT OR IGNORE INTO synonyms_global VALUES(?, ?);', ((word.lower().strip(), request) for word in split[1:]))
+                db_cursor.executemany('INSERT OR IGNORE INTO synonyms_global VALUES(?, ?);',
+                                      ((word.lower().strip(), request) for word in split[1:]))
                 db_connect.commit()
                 n = '\n'
                 return f'К запросу "{request}" добавлены синонимы:\n' \
@@ -688,7 +694,7 @@ class Autoresponder:
         admin_id = str(admin_id)
 
         if roles[users_info.get(admin_id).get('role')] < roles['admin']:
-            return "Недостаточный уровень доступа" + users_info.get(admin_id).get('role')
+            return f'Недостаточный уровень доступа ({users_info.get(admin_id).get("role")})'
 
         split = [x.lower().strip() for x in arg.split('\n')]
         if len(split) != 2 or not split[0].isdigit() or split[1] not in roles:
@@ -717,6 +723,23 @@ class Autoresponder:
     def get_balance(arg, user_id):
         return f'Ваш баланс: {users_info[user_id]["balance"]}💰'
 
+    def give_money(self, arg, admin_id):
+        admin_id = str(admin_id)
+        if arg is None:
+            return self.errors[2]
+        split = arg.split('\n')
+
+        if roles[users_info.get(admin_id).get('role')] < roles['admin']:
+            return f'Недостаточный уровень доступа ({users_info.get(admin_id).get("role")})'
+        elif len(split) != 2 or not self.is_int(split[0]) or not self.is_float(split[1]):
+            return self.errors[2]
+        elif users_info.get(str(split[0])) is None:
+            return 'Пользователь не найден'
+        else:
+            users_info[str(split[0])]['balance'] += float(split[1])
+            return f'Пользователю "{split[0]}" начислено {split[1]}💰.\n' \
+                   f'Баланс: {users_info[str(split[0])]["balance"]}💰'
+
     def game_start(self, arg, user_id, message=None):
         """ Начало игры "Математика".
 
@@ -738,8 +761,14 @@ class Autoresponder:
                                'random_id': 0, 'keyboard': self.keyboard})
 
         elif arg == 'game_math':
-            change_class(user_id, 'game_math')
+            change_users_info(user_id, new_class='game_math')
             game_math_class.start(str(user_id))
+            return
+
+        elif arg == 'game_luck':
+            change_users_info(user_id, new_class='game_luck')
+            game_luck_class.start(str(user_id))
+            return
 
         else:
             keyboard = str(json.dumps(
@@ -747,6 +776,7 @@ class Autoresponder:
                     'inline': False,
                     'buttons': [
                         [get_callback_button('Математика', 'positive', {'args': 'game_math'})],
+                        [get_callback_button('Удача', 'positive', {'args': 'game_luck'})],
                         [get_callback_button("Назад", 'negative', {'args': 'back'})]
                     ]
                 },
@@ -761,7 +791,6 @@ class Autoresponder:
 
             users_info[user_id]['method'] = 'game_start'
             users_info[user_id]['args'] = None
-            return
 
     @staticmethod
     def is_command(string):
@@ -821,11 +850,14 @@ class Autoresponder:
 
         array = np.array(words)
         command_original, rate_original = \
-            min(list(zip(words, list(normalized_damerau_levenshtein_distance_seqs(text_original, array)))), key=lambda x: x[1])
+            min(list(zip(words, list(normalized_damerau_levenshtein_distance_seqs(text_original, array)))),
+                key=lambda x: x[1])
         command_transliteration, rate_transliteration = \
-            min(list(zip(words, list(normalized_damerau_levenshtein_distance_seqs(text_transliteration, array)))), key=lambda x: x[1])
+            min(list(zip(words, list(normalized_damerau_levenshtein_distance_seqs(text_transliteration, array)))),
+                key=lambda x: x[1])
         command_qwerty, rate_qwerty = \
-            min(list(zip(words, list(normalized_damerau_levenshtein_distance_seqs(text_qwerty, array)))), key=lambda x: x[1])
+            min(list(zip(words, list(normalized_damerau_levenshtein_distance_seqs(text_qwerty, array)))),
+                key=lambda x: x[1])
 
         rate = min(rate_original, rate_transliteration, rate_qwerty)
         if rate == rate_original:

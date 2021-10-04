@@ -3,6 +3,7 @@ import threading
 import sqlite3
 from transliterate.discover import autodiscover
 from transliterate.base import TranslitLanguagePack, registry
+from keyboard import get_text_button
 
 # Вся информация о пользователях
 # id: role, class, method, args
@@ -11,6 +12,13 @@ roles = {'user': 0, 'moderator': 1, 'admin': 2, 'master': 3}
 
 # Все ответы на запросы пользователей
 answers = {}
+# Главная клавиатура
+main_keyboard = str(json.dumps({
+    "one_time": False,
+    "buttons": [
+        [get_text_button('!Все запросы', 'primary'), get_text_button('!Все команды', 'primary')]
+    ]
+}, ensure_ascii=False))
 # Связь с базой данных
 db_connect = None
 db_cursor = None
@@ -27,10 +35,11 @@ timer: threading.Timer
 synonyms_stats = []
 
 
-def change_class(user_id, new_class):
-    users_info[user_id]['class'] = new_class
-    users_info[user_id]['method'] = None
-    users_info[user_id]['args'] = None
+def change_users_info(user_id, new_class=None, new_method=None, new_args=None):
+    if new_class is not None:
+        users_info[user_id]['class'] = new_class
+    users_info[user_id]['method'] = new_method
+    users_info[user_id]['args'] = new_args
 
 
 # Регистрация транслитерации по раскладке клавиатуры
@@ -41,13 +50,12 @@ class QWERTYLanguagePack(TranslitLanguagePack):
     language_code = "qwerty"
     language_name = "KeyBoard"
     mapping = (
-       'QWERTYUIOP{}ASDFGHJKL:"ZXCVBNM<>?qwertyuiop[]asdfghjkl;\'zxcvbnm,./',
-       'ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ,йцукенгшщзхъфывапролджэячсмитьбю.',
+        'QWERTYUIOP{}ASDFGHJKL:"ZXCVBNM<>?qwertyuiop[]asdfghjkl;\'zxcvbnm,./',
+        'ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ,йцукенгшщзхъфывапролджэячсмитьбю.',
     )
 
 
 registry.register(QWERTYLanguagePack)
-
 
 # Загрузки данных из файлов
 with open("answers.json", "r", encoding='utf-8') as read_file:
@@ -73,13 +81,16 @@ with open("gamers_active.json", "r", encoding='utf-8') as read_file:
 db_connect = sqlite3.connect('all_data.db')
 db_cursor = db_connect.cursor()
 db_cursor.execute('CREATE TABLE IF NOT EXISTS synonyms_global(word text PRIMARY KEY, request text);')
-db_cursor.executemany('INSERT OR IGNORE INTO synonyms_global VALUES(?, ?);', ((word, word) for word in answers.get('global').keys()))
+db_cursor.executemany('INSERT OR IGNORE INTO synonyms_global VALUES(?, ?);',
+                      ((word, word) for word in answers.get('global').keys()))
 db_connect.commit()
 
-db_cursor.execute('CREATE TABLE IF NOT EXISTS synonyms_stats(phrase text PRIMARY KEY, request text, type text, rate real)')
+db_cursor.execute(
+    'CREATE TABLE IF NOT EXISTS synonyms_stats(phrase text PRIMARY KEY, request text, type text, rate real)')
 db_connect.commit()
 
-db_cursor.execute('CREATE TABLE IF NOT EXISTS users_info(id text PRIMARY KEY, role text, class text, method text, args text)')
+db_cursor.execute(
+    'CREATE TABLE IF NOT EXISTS users_info(id text PRIMARY KEY, role text, class text, method text, args text)')
 db_connect.commit()
 try:
     db_cursor.execute('ALTER TABLE users_info ADD COLUMN balance REAL DEFAULT 0;')
@@ -87,7 +98,8 @@ try:
 except Exception:
     pass
 db_cursor.execute('SELECT id, role, class, method, args, balance FROM users_info')
-users_info = {x[0]: {'role': x[1], 'class': x[2], 'method': x[3], 'args': x[4], 'balance': x[5]} for x in db_cursor.fetchall()}  # [(id, role, class, method, args, balance), (,,,,), ...]
+users_info = {x[0]: {'role': x[1], 'class': x[2], 'method': x[3], 'args': x[4], 'balance': x[5]} for x in
+              db_cursor.fetchall()}  # [(id, role, class, method, args, balance), (,,,,), ...]
 
 
 def set_next_save_all():
@@ -103,13 +115,16 @@ def save_all(is_finally=False):
     db_cursor_save = db_connect_save.cursor()
 
     if users_info != {}:
-        db_cursor_save.executemany('INSERT OR REPLACE INTO users_info(id, role, class, method, args, balance) VALUES(?, ?, ?, ?, ?, ?);',
-                                   [(item[0], item[1].get('role'), item[1].get('class'), item[1].get('method'), item[1].get('args'), item[1].get('balance'))
-                                    for item in users_info.items()])
+        db_cursor_save.executemany(
+            'INSERT OR REPLACE INTO users_info(id, role, class, method, args, balance) VALUES(?, ?, ?, ?, ?, ?);',
+            [(item[0], item[1].get('role'), item[1].get('class'), item[1].get('method'), item[1].get('args'),
+              item[1].get('balance'))
+             for item in users_info.items()])
 
     if synonyms_stats:
-        db_cursor_save.executemany('INSERT OR IGNORE INTO synonyms_stats(phrase, request, type, rate) VALUES(?, ?, ?, ?);',
-                                   synonyms_stats)
+        db_cursor_save.executemany(
+            'INSERT OR IGNORE INTO synonyms_stats(phrase, request, type, rate) VALUES(?, ?, ?, ?);',
+            synonyms_stats)
         synonyms_stats.clear()
 
     with open("answers.json", "w", encoding='utf-8') as write_file:

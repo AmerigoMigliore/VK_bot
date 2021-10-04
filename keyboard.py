@@ -2,7 +2,7 @@ def get_text_button(text, color):
     return {
         "action": {
             "type": "text",
-            "label": text
+            "label": str(text)
         },
         "color": color
     }
@@ -15,7 +15,7 @@ def get_callback_button(text, color, payload):
         "action": {
             "type": "callback",
             "payload": payload,
-            "label": text
+            "label": str(text)
         },
         "color": color
     }
