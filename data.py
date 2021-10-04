@@ -16,7 +16,8 @@ answers = {}
 main_keyboard = str(json.dumps({
     "one_time": False,
     "buttons": [
-        [get_text_button('!Все запросы', 'primary'), get_text_button('!Все команды', 'primary')]
+        [get_text_button('!Все запросы', 'primary'), get_text_button('!Все команды', 'primary')],
+        [get_text_button('!Играть', 'positive')]
     ]
 }, ensure_ascii=False))
 # Связь с базой данных
