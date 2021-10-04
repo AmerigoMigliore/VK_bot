@@ -743,7 +743,8 @@ class Autoresponder:
             return f'Пользователю "{split[0]}" начислено {split[1]}💰.\n' \
                    f'Баланс: {users_info[str(split[0])]["balance"]}💰'
 
-    def game_start(self, arg, user_id, message=None):
+    @staticmethod
+    def game_start(arg, user_id, message=None):
         """ Начало игры "Математика".
 
         :param message: сообщение от пользователя.
