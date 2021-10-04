@@ -2,7 +2,7 @@ import numpy as np
 import re
 import data
 from all_games import game_math_class, game_luck_class
-from data import answers, db_cursor, db_connect, users_info, roles, change_users_info
+from data import answers, db_cursor, db_connect, users_info, roles, change_users_info, main_keyboard
 from pyxdameraulevenshtein import normalized_damerau_levenshtein_distance_seqs
 from transliterate import translit
 from unicodedata import normalize, category
@@ -17,7 +17,6 @@ class Autoresponder:
     commands = {}
     methods = {}
     errors = {}
-    keyboard = {}
 
     def __init__(self):
         self.commands = {'!добавить': [self.add_response, 'Запрос\nОтвет\nОтвет\n...'],
@@ -44,12 +43,6 @@ class Autoresponder:
             'Неизвестная команда.\nУзнать список доступных команд и их синтаксис: !все команды',
             # 2
             'Неверные аргументы.\nУзнать список доступных команд и их синтаксис: !все команды', ]
-        self.keyboard = str(json.dumps({
-            "one_time": False,
-            "buttons": [
-                [get_text_button('!Все запросы', 'primary'), get_text_button('!Все команды', 'primary')]
-            ]
-        }, ensure_ascii=False))
 
     def process_event(self, event):
         """ Обработка сообщений от пользователя двух типов:
@@ -135,7 +128,7 @@ class Autoresponder:
 
                     # Получение списка всех возможных ответов на данный запрос
                     answer = answers.get("global").get(request[0] if request is not None else None, []) + \
-                             answers.get(user_id).get(message, [])
+                        answers.get(user_id).get(message, [])
 
                     # Если найдено совпадение
                     if len(answer) != 0:
@@ -150,13 +143,13 @@ class Autoresponder:
                     if answer[0:2] == "##":
                         vk_session.method('messages.send',
                                           {'user_id': int(user_id), 'sticker_id': answer[2:], 'random_id': 0,
-                                           'keyboard': self.keyboard})
+                                           'keyboard': main_keyboard})
 
                     # Если ответ - не стикер
                     else:
                         vk_session.method('messages.send',
                                           {'user_id': int(user_id), 'message': answer, 'random_id': 0,
-                                           'keyboard': self.keyboard})
+                                           'keyboard': main_keyboard})
 
                 # Если полученное сообщение - команда (формат: !команда, где команда - текст команды)
                 else:
@@ -166,7 +159,7 @@ class Autoresponder:
                     if command_message is not None:
                         vk_session.method('messages.send',
                                           {'user_id': int(user_id), 'message': command_message, 'random_id': 0,
-                                           'keyboard': self.keyboard})
+                                           'keyboard': main_keyboard})
 
     def read_command(self, msg, user_id):
         """ Обработка команд по шаблону:
@@ -528,7 +521,7 @@ class Autoresponder:
             users_info[user_id]['args'] = None
             vk_session.method('messages.send',
                               {'user_id': int(user_id), 'message': "Вы завершили работу с генератором случайных чисел",
-                               'random_id': 0, 'keyboard': self.keyboard})
+                               'random_id': 0, 'keyboard': main_keyboard})
             return
 
         # Случайное вещественное число от 0 до 1
@@ -715,7 +708,7 @@ class Autoresponder:
                                'message': f'Ваш уровень доступа изменен на "{split[1]}" пользователем "{name}" '
                                           f'уровня "{users_info.get(admin_id).get("role")}"',
                                'random_id': 0,
-                               'keyboard': self.keyboard})
+                               'keyboard': main_keyboard})
 
             return f'Пользователю "{split[0]}" выдан уровень доступа "{split[1]}"'
 
@@ -758,7 +751,7 @@ class Autoresponder:
             users_info[user_id]['args'] = None
             vk_session.method('messages.send',
                               {'user_id': int(user_id), 'message': "Вы завершили работу с игровым меню",
-                               'random_id': 0, 'keyboard': self.keyboard})
+                               'random_id': 0, 'keyboard': main_keyboard})
 
         elif arg == 'game_math':
             change_users_info(user_id, new_class='game_math')
