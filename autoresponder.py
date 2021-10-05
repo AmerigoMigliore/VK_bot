@@ -32,7 +32,9 @@ class Autoresponder:
                          '!!удалить синонимы': [self.delete_synonyms, 'Синоним\nСиноним\n...'],
                          '!!синонимы': [self.get_synonyms, 'Запрос'],
                          '!!!изменить роль': [self.set_role, 'ID\nРоль'],
-                         '!!!выдать монеты': [self.give_money, 'ID\nКоличество']
+                         '!!!выдать монеты': [self.give_money, 'ID\nКоличество'],
+                         # '!!!!перезагрузка': [self.reboot, ''],
+                         '!!!!сбросить положение': [self.reset_position, 'ID']
                          }
         self.methods = {'': self.choose_random}
         self.errors = [  # TODO: Поменять на что-то нормальное
@@ -516,7 +518,7 @@ class Autoresponder:
         users_info[user_id]['args'] = arg
 
         # Завершение работы с генератором и возврат к автоответчику
-        if arg == 'back':
+        if arg == 'back' or (message is not None and message.lower().strip() == 'назад'):
             users_info[user_id]['method'] = None
             users_info[user_id]['args'] = None
             vk_session.method('messages.send',
@@ -878,3 +880,25 @@ class Autoresponder:
             return
 
         return command
+
+    def reset_position(self, arg, admin_id):
+        admin_id = str(admin_id)
+
+        if roles[users_info.get(admin_id).get('role')] < roles['admin']:
+            return f'Недостаточный уровень доступа ({users_info.get(admin_id).get("role")})'
+        elif arg is None or not self.is_int(arg):
+            return self.errors[2]
+        elif users_info.get(str(arg)) is None:
+            return 'Пользователь не найден'
+        else:
+            change_users_info(user_id=str(arg), new_class='autoresponder')
+
+            user = vk_session.method('users.get', {'user_ids': int(admin_id)})[0]
+            name = f"{user.get('first_name')} {user.get('last_name')}"
+            vk_session.method('messages.send',
+                              {'user_id': int(arg),
+                               'message': f'Вы были перенаправлены в главное меню бота пользователем "{name}" '
+                                          f'уровня "{users_info.get(admin_id).get("role")}"',
+                               'random_id': 0, 'keyboard': main_keyboard})
+            return f'Пользователь "{arg}" отправлен в главное меню.'
+
