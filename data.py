@@ -43,6 +43,10 @@ def change_users_info(user_id, new_class=None, new_method=None, new_args=None):
     users_info[user_id]['args'] = new_args
 
 
+def add_new_user(user_id):
+    users_info[str(user_id)] = {'role': 'user', 'class': 'autoresponder', 'method': None, 'args': None, 'balance': 0}
+
+
 # Регистрация транслитерации по раскладке клавиатуры
 autodiscover()
 

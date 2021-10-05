@@ -707,8 +707,7 @@ class Autoresponder:
                               {'user_id': int(split[0]),
                                'message': f'Ваш уровень доступа изменен на "{split[1]}" пользователем "{name}" '
                                           f'уровня "{users_info.get(admin_id).get("role")}"',
-                               'random_id': 0,
-                               'keyboard': main_keyboard})
+                               'random_id': 0})
 
             return f'Пользователю "{split[0]}" выдан уровень доступа "{split[1]}"'
 
@@ -738,8 +737,7 @@ class Autoresponder:
                                'message': f'Вам начислено "{split[1]}"💰 пользователем "{name}" '
                                           f'уровня "{users_info.get(admin_id).get("role")}"\n'
                                           f'Баланс: {users_info[str(split[0])]["balance"]}💰',
-                               'random_id': 0,
-                               'keyboard': main_keyboard})
+                               'random_id': 0})
             return f'Пользователю "{split[0]}" начислено {split[1]}💰.\n' \
                    f'Баланс: {users_info[str(split[0])]["balance"]}💰'
 

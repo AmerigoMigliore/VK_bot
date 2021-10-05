@@ -2,7 +2,7 @@
 
 import sys
 import threading
-from data import roles, save_all, users_info, game_math_stats
+from data import roles, save_all, users_info, game_math_stats, add_new_user
 from vk_auth import longpoll
 from autoresponder import Autoresponder
 from all_games import game_math_class, game_luck_class
@@ -64,7 +64,7 @@ def main():
 
                         # Регистрация пользователей при первом запросе
                         if str(user_id) not in users_info.keys():
-                            users_info[str(user_id)] = {'role': 'user', 'class': 'autoresponder', 'method': None, 'args': None}
+                            add_new_user(user_id)
 
                         # Основная обработка сообщений
                         all_classes.get(users_info.get(str(user_id), {}).get('class', 'autoresponder'))\
