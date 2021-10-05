@@ -103,7 +103,7 @@ try:
 except Exception:
     pass
 db_cursor.execute('SELECT id, role, class, method, args, balance FROM users_info')
-users_info = {x[0]: {'role': x[1], 'class': x[2], 'method': x[3], 'args': x[4], 'balance': x[5] if x[5] is not None else 0} for x in
+users_info = {x[0]: {'role': x[1], 'class': x[2], 'method': x[3], 'args': x[4], 'balance': x[5]} for x in
               db_cursor.fetchall()}  # [(id, role, class, method, args, balance), (,,,,), ...]
 
 
