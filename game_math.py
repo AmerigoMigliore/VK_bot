@@ -237,9 +237,9 @@ class GameMath:
         self.cancel_timer(user_id)
 
         # Обновление рейтинга, если надо
-        if game_math_stats.get(user_id, {}).get('score', 0) > game_math_top.get(user_id, {}).get('record', 0):
+        if game_math_stats.get(user_id, {}).get('score', 0) > game_math_top.get(user_id, {}).get('record', -1):
             # Начисление бонусных жизней, если игрок побил личный рекорд, но >= 15 очков
-            for score in range(15, game_math_stats.get(user_id).get('score'), 15):
+            for score in range(15, game_math_stats.get(user_id, {}).get('score', 0), 15):
                 if game_math_top.get(user_id, {}).get('record', 0) < score:
                     game_math_stats[user_id]['lives'] += 3
                     vk_session.method('messages.send',
@@ -253,7 +253,7 @@ class GameMath:
             name = f"{user.get('first_name')} {user.get('last_name')}"
 
             # Запись нового рекорда в рейтинг
-            game_math_top.update({user_id: {'name': name, 'record': game_math_stats.get(user_id).get('score')}})
+            game_math_top.update({user_id: {'name': name, 'record': game_math_stats.get(user_id, {}).get('score', 0)}})
 
         if back:
             # Если пользователь хочет закончить игру
@@ -417,20 +417,24 @@ class GameMath:
         :param user_id: ID пользователя, вызвавшего команду.
         :type user_id: int или str.
         """
-        top_sort = []
-        for gamer in game_math_top.values():
-            top_sort.append([gamer.get('name'), gamer.get('record')])
-        top_sort.sort(key=get_points, reverse=True)
-
         string_top = str()
-        num = 0
-        for gamer in top_sort:
-            num += 1
-            string_top += "{}. {}:\n Верных ответов: {}\n\n".format(num, gamer[0], gamer[1])
 
-        # Минутка хвастовства
-        if top_sort[0][0] == "Александр Березин":
-            string_top += "О, мой хозяин на первом месте!&#128526;"
+        if not game_math_top.values():
+            string_top = 'Рейтинг пока пуст. Стань первым!'
+        else:
+            top_sort = []
+            for gamer in game_math_top.values():
+                top_sort.append([gamer.get('name'), gamer.get('record')])
+            top_sort.sort(key=get_points, reverse=True)
+
+            num = 0
+            for gamer in top_sort:
+                num += 1
+                string_top += "{}. {}:\n Верных ответов: {}\n\n".format(num, gamer[0], gamer[1])
+
+            # Минутка хвастовства
+            if top_sort[0][0] == "Александр Березин":
+                string_top += "О, мой хозяин на первом месте!&#128526;"
 
         if game_math_stats[str(user_id)]['is_active']:
             vk_session.method('messages.send',
