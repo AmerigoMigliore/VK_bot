@@ -40,16 +40,15 @@ def multiplication(rand_min, rand_max):
 
 
 def division(rand_min, rand_max):
-    a = random.randint(rand_min, rand_max)
+    a = 0
+    while a == 0:
+        a = random.randint(rand_min, rand_max)
     b = random.randint(rand_min, rand_max)
     return [a * b, a, b]
 
 
-def get_points(gamer):
-    return gamer[1]
-
-
 class GameMath:
+    """ Класс игры 'Математика' """
     texts = None
     game_levels = None
     start_keyboard = None
@@ -376,7 +375,7 @@ class GameMath:
 
         vk_session.method('messages.send',
                           {'user_id': int(user_id), 'message': "Уровень {}\nСколько будет {} {} {}?"
-                                                    .format(str(level), formula[0], symbol, formula[1]),
+                          .format(str(level), formula[0], symbol, formula[1]),
                            'random_id': 0, 'keyboard': create_keyboard(nums)})
 
         game_math_stats.update(
@@ -425,7 +424,7 @@ class GameMath:
             top_sort = []
             for gamer in game_math_top.values():
                 top_sort.append([gamer.get('name'), gamer.get('record')])
-            top_sort.sort(key=get_points, reverse=True)
+            top_sort.sort(key=lambda x: x[1], reverse=True)
 
             num = 0
             for gamer in top_sort:
