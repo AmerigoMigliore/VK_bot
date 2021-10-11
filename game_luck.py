@@ -1,37 +1,25 @@
 from vk_auth import vk_session, VkBotEventType
 from data import users_info, change_users_info, main_keyboard
-from keyboard import get_callback_button
+from keyboard import get_callback_button, get_text_button
 import json
 import random
 
 
 class GameLuck:
-    texts = None
     start_keyboard = None
 
     def __init__(self):
-        self.texts = [
-            # 0
-            'Сыграй в "Удачу" и выиграй дачу!',
-            # 1
-            'Правила просты: выбираешь миниигру и выигрываешь!\n'
-            'Не всегда, конечно, но, надеюсь, часто!\n'
-            'У каждой миниигры свои правила - они доступны в меню миниигры.\n'
-            'Читай внимательно, ничего не упускай, и тогда удача будет на твоей стороне!\n'
-            'Если все понятно - жми нопку "Начать"\n'
-            'P.S. Участие платное и доступно за 💰💰💰. Их можно получить в других играх.'
-        ]
         self.start_keyboard = str(json.dumps(
-            {
-                "one_time": True,
-                "buttons": [
-                    [get_callback_button('Правила', 'primary', {'args': 'rules'}),
-                     get_callback_button('Начать', 'positive', {'args': 'choose_lottery'})],
-                    # [get_callback_button('Магазин', 'secondary', {'args': 'store'})],
-                    [get_callback_button('Завершить игру', 'negative', {'args': 'back'})]
-                ]
-            },
-            ensure_ascii=False))
+                {
+                    'inline': False,
+                    'one_time': True,
+                    'buttons': [
+                        [get_callback_button('Случайное число', 'positive', {'args': 'random_number'})],
+                        [get_callback_button('3 из 9', 'positive', {'args': 'three_out_of_nine'})],
+                        [get_callback_button('Назад', 'negative', {'args': 'back'})]
+                    ]
+                },
+                ensure_ascii=False))
 
     def process_event(self, event):
         """ Обработка сообщений от пользователя для игры "Математика"
@@ -49,22 +37,15 @@ class GameLuck:
             args = event.obj.payload.get('args')
 
             if method == 'start':
-                if args == 'rules':
-                    self.get_rules(user_id)
-                elif args == 'choose_lottery':
-                    self.choose_lottery(user_id, args)
-                elif args == 'store':
-                    pass
-                elif args == 'back':
+                if args == 'back':
                     vk_session.method('messages.send',
                                       {'user_id': int(user_id),
                                        'message': 'Сегодня твой удачный день! Приходи еще!',
                                        'random_id': 0, 'keyboard': main_keyboard})
                     change_users_info(user_id, 'autoresponder')
                     return
-
-            elif method == 'choose_lottery':
-                self.choose_lottery(user_id, args)
+                else:
+                    self.start(user_id, args)
 
             elif method == 'random_number':
                 self.random_number(user_id, args)
@@ -86,32 +67,13 @@ class GameLuck:
             if method == 'random_number':
                 self.random_number(user_id, args, message)
 
-    def start(self, user_id):
+            if method == 'three_out_of_nine':
+                self.three_out_of_nine(user_id, args, message)
+
+    def start(self, user_id, args=None):
         user_id = str(user_id)
 
-        vk_session.method('messages.send',
-                          {'user_id': int(user_id),
-                           'message': f'{self.texts[0]}\n'
-                                      f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n',
-                           'random_id': 0, 'keyboard': self.start_keyboard})
-        change_users_info(user_id, new_method='start')
-
-    def get_rules(self, user_id):
-        if users_info.get(user_id, {}).get('method') == 'start':
-            keyboard = self.start_keyboard
-        else:
-            keyboard = None
-
-        vk_session.method('messages.send',
-                          {'user_id': int(user_id), 'message': self.texts[1],
-                           'random_id': 0, 'keyboard': keyboard})
-
-    def choose_lottery(self, user_id, args=None):
-        if args == 'back':
-            change_users_info(user_id, new_method='start')
-            self.start(user_id)
-            return
-        elif args == 'random_number':
+        if args == 'random_number':
             change_users_info(user_id, new_method=args)
             self.random_number(user_id)
             return
@@ -120,35 +82,24 @@ class GameLuck:
             self.three_out_of_nine(user_id)
             return
         else:
-            keyboard = str(json.dumps(
-                {
-                    'inline': False,
-                    'one_time': True,
-                    'buttons': [
-                        [get_callback_button('Случайное число', 'positive', {'args': 'random_number'})],
-                        [get_callback_button('3 из 9', 'positive', {'args': 'three_out_of_nine'})],
-                        [get_callback_button('Назад', 'negative', {'args': 'back'})]
-                    ]
-                },
-                ensure_ascii=False))
+            message = f'~Честные лотереи~\n\n' \
+                      f'Выберите игру.\n' \
+                      f'Для возврата выберите кнопку "Назад"' \
+                      f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n'
 
-            message = '~Честные лотереи~\n\n' \
-                      'Выберите игру.\n' \
-                      'Для возврата выберите кнопку "Назад"'
+            vk_session.method('messages.send',
+                              {'user_id': int(user_id), 'message': message,
+                               'random_id': 0,
+                               'keyboard': self.start_keyboard})
 
-            change_users_info(user_id, new_method='choose_lottery')
-
-        vk_session.method('messages.send',
-                          {'user_id': int(user_id), 'message': message,
-                           'random_id': 0,
-                           'keyboard': keyboard})
+            change_users_info(user_id, new_method='start')
 
     def random_number(self, user_id, args=None, number=None):
         keyboard = None
 
         if args == 'back':
-            change_users_info(user_id, new_method='choose_lottery')
-            self.choose_lottery(user_id)
+            change_users_info(user_id, new_method='start')
+            self.start(user_id)
             return
 
         elif args == 'rules':
@@ -249,13 +200,12 @@ class GameLuck:
                            'random_id': 0,
                            'keyboard': keyboard})
 
-    def three_out_of_nine(self, user_id, args=None):
+    def three_out_of_nine(self, user_id, args=None, msg=None):
         keyboard = str(json.dumps(
             {
-                'inline': False,
-                'one_time': False,
+                'one_time': True,
                 'buttons': [
-                    [get_callback_button('Играть (1💰)', 'positive', {'args': 'play'})],
+                    [get_text_button('Играть (1💰)', 'positive')],
                     [get_callback_button('Правила', 'primary', {'args': 'rules'}),
                      get_callback_button('Назад', 'negative', {'args': 'back'})]
                 ]
@@ -263,8 +213,8 @@ class GameLuck:
             ensure_ascii=False))
 
         if args == 'back':
-            change_users_info(user_id, new_method='choose_lottery')
-            self.choose_lottery(user_id)
+            change_users_info(user_id, new_method='start')
+            self.start(user_id)
             return
 
         elif args == 'rules':
@@ -278,22 +228,32 @@ class GameLuck:
                       '1 число из 3 - 2💰\n\n' \
                       'Стоимость игры: 1💰'
 
-        elif args == 'play':
-            if users_info.get(user_id, {}).get('balance', 0) >= 1:
-                users_info[user_id]['balance'] -= 1
+        elif msg is not None:
+            if msg == 'играть (1💰)':
+                if users_info.get(user_id, {}).get('balance', 0) >= 1:
+                    users_info[user_id]['balance'] -= 1
 
-                users_info[user_id]['args'] = {}
-                users_info[user_id]['args']['play'] = True
-                users_info[user_id]['args']['keyboard'] = ['secondary'] * 9
-                users_info[user_id]['args']['answer'] = random.sample(range(1, 10), 3)
-                users_info[user_id]['args']['count'] = 0
+                    users_info[user_id]['args'] = {}
+                    users_info[user_id]['args']['play'] = True
+                    users_info[user_id]['args']['keyboard'] = ['secondary'] * 9
+                    users_info[user_id]['args']['answer'] = random.sample(range(1, 10), 3)
+                    users_info[user_id]['args']['count'] = 0
 
-                message = 'Я загадал 3 числа. Выбор за тобой!'
-                keyboard = self.get_keyboard(user_id)
+                    message = 'Я загадал 3 числа. Выбор за тобой!'
+                    keyboard = self.get_keyboard(user_id)
 
+                    users_info[user_id]['args']['message_id'] = vk_session.method('messages.send',
+                                                                                  {'user_id': int(user_id),
+                                                                                   'message': message,
+                                                                                   'random_id': 0,
+                                                                                   'keyboard': keyboard})
+                    return
+
+                else:
+                    message = f'Недостаточно 💰 для игры\n' \
+                              f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n'
             else:
-                message = f'Недостаточно 💰 для игры\n' \
-                          f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n'
+                return
 
         elif users_info.get(user_id, {}).get('args', {}) is not None and \
                 users_info.get(user_id, {}).get('args', {}).get('play', False) and str(args).isdigit():
@@ -328,7 +288,18 @@ class GameLuck:
                     message += f'Увы, ни одно число не угадано.\n'
 
                 message += f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n'
+
+            vk_session.method('messages.edit',
+                              {'peer_id': int(user_id), 'message': message,
+                               'message_id': users_info.get(user_id, {}).get('args', {}).get('message_id', 0),
+                               'random_id': 0,
+                               'keyboard': keyboard})
+
+            if users_info[user_id]['args']['count'] == 3:
                 users_info[user_id]['args'] = None
+                self.three_out_of_nine(user_id)
+
+            return
 
         else:
             message = '~3 из 9~\n\n' \
@@ -343,8 +314,7 @@ class GameLuck:
     @staticmethod
     def get_keyboard(user_id):
         keyboard = {
-            'inline': False,
-            'one_time': False,
+            'inline': True,
             'buttons': [[], [], []]
         }
 
@@ -352,9 +322,6 @@ class GameLuck:
             return None
 
         for i, c in enumerate(users_info[user_id]['args']['keyboard']):
-            keyboard['buttons'][i // 3] += [get_callback_button(i+1, c, {'args': i+1})]
-
-        if users_info[user_id]['args']['keyboard'].count('secondary') == 6:
-            keyboard['buttons'] += [[get_callback_button('Назад', 'negative', {'args': ''})]]
+            keyboard['buttons'][i // 3] += [get_callback_button(i + 1, c, {'args': i + 1})]
 
         return str(json.dumps(keyboard, ensure_ascii=False))
