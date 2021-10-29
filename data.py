@@ -105,7 +105,7 @@ users_info = {x[0]: {'role': x[1], 'class': x[2], 'method': x[3], 'args': x[4], 
 
 def set_next_save_all():
     global timer
-    timer = threading.Timer(20, save_all)
+    timer = threading.Timer(3600 * 3, save_all)
     timer.start()
 
 
