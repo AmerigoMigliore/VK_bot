@@ -1,8 +1,11 @@
+import sqlite3
+import time
+
 import numpy as np
 import re
 import data
 from all_games import game_math_class, game_luck_class
-from data import answers, db_cursor, db_connect, users_info, roles, change_users_info, main_keyboard
+from data import answers, users_info, roles, change_users_info, main_keyboard
 from pyxdameraulevenshtein import normalized_damerau_levenshtein_distance_seqs
 from transliterate import translit
 from unicodedata import normalize, category
@@ -34,7 +37,8 @@ class Autoresponder:
                          '!!!изменить роль': [self.set_role, 'ID\nРоль'],
                          '!!!выдать монеты': [self.give_money, 'ID\nКоличество'],
                          # '!!!!перезагрузка': [self.reboot, ''],
-                         '!!!!сбросить положение': [self.reset_position, 'ID']
+                         '!!!!сбросить положение': [self.reset_position, 'ID'],
+                         '!!!!статистика синонимов': [self.get_synonyms_stats, '']
                          }
         self.methods = {'': self.choose_random}
         self.errors = [  # TODO: Поменять на что-то нормальное
@@ -104,11 +108,9 @@ class Autoresponder:
                 return
 
             else:
-                if message == "":
-                    answer = self.errors[0]
-
                 # Если сообщение - не команда
-                elif not self.is_command(message):
+                if not self.is_command(message):
+                    db_cursor = sqlite3.connect('all_data.db').cursor()
 
                     # Удаление лишних и изменение специальных символов и повторов букв в словах
                     message = re.sub(r'([\D])(\1)+', r'\1',
@@ -369,6 +371,8 @@ class Autoresponder:
             if len(split) < 2:
                 return self.errors[2]
             else:
+                db_connect = sqlite3.connect('all_data.db')
+                db_cursor = db_connect.cursor()
                 db_cursor.executemany('INSERT OR IGNORE INTO synonyms_global VALUES(?, ?);',
                                       ((word.lower().strip(), request) for word in split[1:]))
                 db_connect.commit()
@@ -385,6 +389,8 @@ class Autoresponder:
             if len(split) != 1:
                 return self.errors[2]
             else:
+                db_connect = sqlite3.connect('all_data.db')
+                db_cursor = db_connect.cursor()
                 db_cursor.execute(f'SELECT word FROM synonyms_global WHERE request="{split[0].lower().strip()}"')
                 synonyms = db_cursor.fetchall()
                 if len(synonyms) == 0:
@@ -404,6 +410,8 @@ class Autoresponder:
             if len(split) < 2:
                 return self.errors[2]
             else:
+                db_connect = sqlite3.connect('all_data.db')
+                db_cursor = db_connect.cursor()
                 db_cursor.execute(f'SELECT word FROM synonyms_global WHERE request="{request}"')
                 synonyms = db_cursor.fetchall()
                 if len(synonyms) == 0:
@@ -423,6 +431,20 @@ class Autoresponder:
                     return f'У запроса "{request}" ' \
                            f'удалены синонимы:\n{return_deleted_synonyms}\n\n' \
                            f'Проигнорированы синонимы:\n{return_invalid_synonyms}'
+
+    def get_synonyms_stats(self, arg, user_id):
+        user_id = str(user_id)
+        if roles[users_info.get(user_id).get('role')] < roles['master']:
+            return "Недостаточный уровень доступа"
+        else:
+            db_cursor = sqlite3.connect('all_data.db').cursor()
+
+            # Получение всех доступных синонимов
+            db_cursor.execute(f'SELECT phrase, request, type, rate FROM synonyms_stats')
+            all_synonyms = db_cursor.fetchall()
+            all_synonyms = [f'USER\'S PHRASE: {x[0]}, BEST REQUEST: {x[1]}, TYPE OF FIX: {x[2]}, RATE: {x[3]}\n\n'
+                            for x in all_synonyms] if len(all_synonyms) > 0 else 'NOT FOUND'
+            return all_synonyms
 
     @staticmethod
     def get_all_requests(arg, user_id):
@@ -901,4 +923,3 @@ class Autoresponder:
                                           f'уровня "{users_info.get(admin_id).get("role")}"',
                                'random_id': 0, 'keyboard': main_keyboard})
             return f'Пользователь "{arg}" отправлен в главное меню.'
-

@@ -95,16 +95,12 @@ db_cursor.execute(
 db_connect.commit()
 
 db_cursor.execute(
-    'CREATE TABLE IF NOT EXISTS users_info(id text PRIMARY KEY, role text, class text, method text, args text)')
+    'CREATE TABLE IF NOT EXISTS users_info(id text PRIMARY KEY, role text, class text, method text, args text, balance REAL DEFAULT 0)')
 db_connect.commit()
-try:
-    db_cursor.execute('ALTER TABLE users_info ADD COLUMN balance REAL DEFAULT 0;')
-    db_connect.commit()
-except Exception:
-    pass
+
 db_cursor.execute('SELECT id, role, class, method, args, balance FROM users_info')
 users_info = {x[0]: {'role': x[1], 'class': x[2], 'method': x[3], 'args': x[4], 'balance': x[5]} for x in
-              db_cursor.fetchall()}  # [(id, role, class, method, args, balance), (,,,,), ...]
+              db_cursor.fetchall()}  # [(id, role, class, method, args, balance), (,,,,,), ...]
 
 
 def set_next_save_all():
