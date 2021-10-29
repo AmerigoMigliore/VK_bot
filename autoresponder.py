@@ -31,6 +31,9 @@ class Autoresponder:
                          '!рандом': [self.choose_random, ''],
                          '!играть': [self.game_start, ''],
                          '!баланс': [self.get_balance, ''],
+                         '!!добавить': [self.add_global_response, 'Запрос\nОтвет\nОтвет\n...'],
+                         '!!удалить ответы': [self.delete_global_response, 'Запрос\nОтвет\nОтвет\n...'],
+                         '!!удалить запрос': [self.delete_all_global_responses, 'Запрос'],
                          '!!добавить синонимы': [self.add_synonyms, 'Запрос\nСиноним\nСиноним\n...'],
                          '!!удалить синонимы': [self.delete_synonyms, 'Синоним\nСиноним\n...'],
                          '!!синонимы': [self.get_synonyms, 'Запрос'],
@@ -238,8 +241,8 @@ class Autoresponder:
 
         # Проход по всем ответам и их запись в список ответов на данный запрос и строку для ответа пользователю
         for response in split[1:]:
-            response.split()
-            if response in answers.get(user_id).get(request, []) or \
+            response = response.strip()
+            if response in all_responses or \
                     (response[0:2] == "##" and not response[2:].isalpha()):
                 return_invalid_responses += f"\n\"{response}\""
             else:
@@ -292,7 +295,7 @@ class Autoresponder:
             return self.errors[2]
 
         # Проверка запроса на существование в словаре ответов для данного пользователя
-        if request not in answers.get(user_id):
+        if request not in answers.get(user_id, {}):
             return f'Запрос "{request.capitalize()}" не найден в Вашем словаре ответов'
 
         # Получение уже имеющихся ответов по данному запросу из словаря для данного пользователя
@@ -358,6 +361,181 @@ class Autoresponder:
 
         # Возврат сообщения о завершении удаления ответов
         return f'Запрос "{request.capitalize()}" полностью удален из Вашего словаря ответов'
+
+    def add_global_response(self, arg, user_id):
+        """ Добавление нового запроса или новых ответов к уже существующему запросу для всех пользователей.
+        Уровень доступа: модератор.
+
+        :param arg: сообщение от пользователя по шаблону:
+            - Первая строка: запрос.
+            - Последующие строки: ответ.
+
+            Примечания:
+                - Строки разделяются символом '\n'.
+                - На запрос можно добавить 1 и более ответов, разделенных между собой символом '\n'.
+        :type arg: str.
+
+        :param user_id: ID пользователя, вызвавшего команду.
+        :type user_id: int или str.
+
+        :return: сообщение об ошибке или сообщение об ответах, которые добавлены и недобавлены на данный запрос.
+        """
+        user_id = str(user_id)
+        if roles[users_info.get(user_id).get('role')] < roles['moderator']:
+            return "Недостаточный уровень доступа"
+        else:
+            # Проверка на пустоту аргумента запроса и ответов
+            if arg.count('\n') == 0:
+                return self.errors[2]
+
+            # Разделение аргумента по строкам. Первая строка - запрос; последующие - ответы
+            split = arg.split('\n')
+
+            # Извлечение запроса и удаление лишних небуквенных символов
+            request = re.sub(r'([\D])(\1)+', r'\1',
+                             re.sub(r'\W+', ' ',
+                                    ''.join(c for c in normalize('NFD', split[0]) if category(c) != 'Mn')
+                                    ).lower().strip(),
+                             flags=re.I)
+
+            # Проверка запроса на корректность
+            if len(request) == 0:
+                return self.errors[2]
+
+            # Получение уже имеющихся ответов по данному запросу из словаря для всех пользователей
+            all_responses = answers.get('global', {}).get(request, [])
+
+            return_added_responses = str()
+            return_invalid_responses = str()
+
+            # Проход по всем ответам и их запись в список ответов на данный запрос и строку для ответа модератору
+            for response in split[1:]:
+                response = response.strip()
+                if response in all_responses or \
+                        (response[0:2] == "##" and not response[2:].isalpha()):
+                    return_invalid_responses += f"\n\"{response}\""
+                else:
+                    all_responses.append(response)
+                    return_added_responses += f"\n\"{response}\""
+
+            # Обновление списка ответов на данный запрос для всех пользователей
+            answers['global'][request] = all_responses
+
+            # Возврат сообщения о завершении добавления ответов
+            return f'На глобальный запрос "{request.capitalize()}" добавлены ответы:' \
+                   f'{return_added_responses}\n\n' \
+                   f'Проигнорированы ответы: {return_invalid_responses}'
+
+    def delete_global_response(self, arg, user_id):
+        """ Выборочное удаление ответов на запрос для всех пользователей.
+        Уровень доступа: модератор.
+
+        :param arg: сообщение от пользователя по шаблону:
+            - Первая строка: запрос.
+            - Последующие строки: ответ.
+
+            Примечания:
+                - Строки разделяются символом '\n'.
+                - У запроса можно удалить 1 и более ответов, разделенных между собой символом '\n'.
+        :type arg: str.
+
+        :param user_id: ID пользователя, вызвавшего команду.
+        :type user_id: int или str.
+
+        :return: сообщение об ошибке или сообщение об ответах, которые удалены и неудалены для данного запроса.
+        """
+        user_id = str(user_id)
+        if roles[users_info.get(user_id).get('role')] < roles['moderator']:
+            return "Недостаточный уровень доступа"
+        else:
+            # Проверка аргумента на пустоту
+            if arg.count('\n') == 0:
+                return self.errors[2]
+
+            # Разделение аргумента по строкам. Первая строка - запрос; последующие - ответы
+            split = arg.split('\n')
+
+            # Извлечение запроса и удаление лишних небуквенных символов
+            request = re.sub(r'([\D])(\1)+', r'\1',
+                             re.sub(r'\W+', ' ',
+                                    ''.join(c for c in normalize('NFD', split[0]) if category(c) != 'Mn')
+                                    ).lower().strip(),
+                             flags=re.I)
+
+            # Проверка запроса на корректность
+            if len(request) == 0:
+                return self.errors[2]
+
+            # Проверка запроса на существование в словаре ответов для всех пользователей
+            if request not in answers.get('global', {}):
+                return f'Запрос "{request.capitalize()}" не найден в глобальном словаре ответов'
+
+            # Получение уже имеющихся ответов по данному запросу из словаря для всех пользователей
+            all_responses = answers.get('global').get(request, [])
+            return_deleted_responses = str()
+            return_invalid_responses = str()
+            is_deleted_all = False
+
+            for response in split[1:]:
+                response = response.strip()
+                if response not in all_responses:
+                    return_invalid_responses += f'\n"{response}"'
+                else:
+                    all_responses.remove(response)
+                    return_deleted_responses += f'\n"{response}"'
+
+            # Проверка запроса на наличие ответов и удаление необходимых ответов из словаря для всех пользователей
+            if len(all_responses) == 0:
+                answers.get('global').pop(request)
+                is_deleted_all = True
+            else:
+                answers['global'][request] = all_responses
+
+            # Возврат сообщения о завершении удаления ответов
+            if is_deleted_all:
+                return f'Запрос "{request.capitalize()}" полностью удален из глобального словаря ответов'
+            else:
+                return f'На глобальный запрос "{request.capitalize()}" удалены ответы: ' \
+                       f'{return_deleted_responses}\n\n' \
+                       f'Проигнорированы ответы: {return_invalid_responses}'
+
+    def delete_all_global_responses(self, arg, user_id):
+        """ Удаление всего запроса для всех пользователей.
+        Уровень доступа: модератор.
+
+        :param arg: сообщение от пользователя по шаблону:
+            - Первая строка: запрос.
+        :type arg: str.
+
+        :param user_id: ID пользователя, вызвавшего команду.
+        :type user_id: int или str.
+
+        :return: сообщение об ошибке или сообщение об удалении данного запроса.
+        """
+        user_id = str(user_id)
+        if roles[users_info.get(user_id).get('role')] < roles['moderator']:
+            return "Недостаточный уровень доступа"
+        else:
+            # Извлечение запроса и удаление лишних небуквенных символов
+            request = re.sub(r'([\D])(\1)+', r'\1',
+                             re.sub(r'\W+', ' ',
+                                    ''.join(c for c in normalize('NFD', arg) if category(c) != 'Mn')
+                                    ).lower().strip(),
+                             flags=re.I)
+
+            # Проверка запроса на корректность
+            if len(request) == 0:
+                return self.errors[2]
+
+            # Проверка запроса на существование в словаре ответов для всех пользователей
+            if request not in answers.get('global'):
+                return f'Запрос "{request.capitalize()}" не найден в глобальном словаре ответов'
+
+            # Удаление всего запроса из словаря ответов для всех пользователей
+            answers.get('global').pop(request)
+
+            # Возврат сообщения о завершении удаления ответов
+            return f'Запрос "{request.capitalize()}" полностью удален из глобального словаря ответов'
 
     def add_synonyms(self, arg, user_id):
         user_id = str(user_id)
