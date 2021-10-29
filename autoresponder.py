@@ -432,19 +432,23 @@ class Autoresponder:
                            f'удалены синонимы:\n{return_deleted_synonyms}\n\n' \
                            f'Проигнорированы синонимы:\n{return_invalid_synonyms}'
 
-    def get_synonyms_stats(self, arg, user_id):
+    @staticmethod
+    def get_synonyms_stats(arg, user_id):
         user_id = str(user_id)
         if roles[users_info.get(user_id).get('role')] < roles['master']:
             return "Недостаточный уровень доступа"
         else:
             db_cursor = sqlite3.connect('all_data.db').cursor()
 
-            # Получение всех доступных синонимов
-            db_cursor.execute(f'SELECT phrase, request, type, rate FROM synonyms_stats')
+            db_cursor.execute('SELECT phrase, request, type, rate FROM synonyms_stats')
             all_synonyms = db_cursor.fetchall()
+            # db_cursor.execute('DELETE FROM synonyms_stats')
             all_synonyms = [f'USER\'S PHRASE: {x[0]}, BEST REQUEST: {x[1]}, TYPE OF FIX: {x[2]}, RATE: {x[3]}\n\n'
                             for x in all_synonyms] if len(all_synonyms) > 0 else 'NOT FOUND'
-            return all_synonyms
+            return_string = str()
+            for s in all_synonyms:
+                return_string += s
+            return return_string
 
     @staticmethod
     def get_all_requests(arg, user_id):
@@ -888,13 +892,16 @@ class Autoresponder:
         rate = min(rate_original, rate_transliteration, rate_qwerty)
         if rate == rate_original:
             command = command_original
-            data.synonyms_stats += [(text, command, "original", rate)]
+            if rate > 0:
+                data.synonyms_stats += [(text, command, "original", rate)]
         elif rate == rate_transliteration:
             command = command_transliteration
-            data.synonyms_stats += [(text, command, "transliteration", rate)]
+            if rate > 0:
+                data.synonyms_stats += [(text, command, "transliteration", rate)]
         else:
             command = command_qwerty
-            data.synonyms_stats += [(text, command, "qwerty", rate)]
+            if rate > 0:
+                data.synonyms_stats += [(text, command, "qwerty", rate)]
 
         # Подобранное значение для определения совпадения текста среди значений указанного списка
         # Если True, считаем что слишком много ошибок в слове, т.е. text среди запросов нет

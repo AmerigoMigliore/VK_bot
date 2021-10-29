@@ -105,7 +105,7 @@ users_info = {x[0]: {'role': x[1], 'class': x[2], 'method': x[3], 'args': x[4], 
 
 def set_next_save_all():
     global timer
-    timer = threading.Timer(3600 * 3, save_all)
+    timer = threading.Timer(20, save_all)
     timer.start()
 
 
@@ -126,6 +126,7 @@ def save_all(is_finally=False):
         db_cursor_save.executemany(
             'INSERT OR IGNORE INTO synonyms_stats(phrase, request, type, rate) VALUES(?, ?, ?, ?);',
             synonyms_stats)
+        print(synonyms_stats)
         synonyms_stats.clear()
 
     with open("answers.json", "w", encoding='utf-8') as write_file:
