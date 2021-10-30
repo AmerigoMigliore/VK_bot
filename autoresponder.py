@@ -1,8 +1,8 @@
 import sqlite3
-import time
 
 import numpy as np
 import re
+
 import data
 from all_games import game_math_class, game_luck_class
 from data import answers, users_info, roles, change_users_info, main_keyboard
@@ -11,7 +11,7 @@ from transliterate import translit
 from unicodedata import normalize, category
 from keyboard import *
 import json
-from vk_auth import VkBotEventType, vk_session
+from vk_auth import VkBotEventType, vk_session, VkEventType, my_vk_session, my_longpoll
 import random
 
 
@@ -144,7 +144,17 @@ class Autoresponder:
 
                     # Если совпадений не найдено
                     else:
-                        answer = self.errors[0]
+                        # Интеграция с Марусей (id=194070336)
+                        my_vk_session.method('messages.send',
+                                             {'peer_id': -194070336, 'message': message, 'random_id': 0})
+
+                        for event in my_longpoll.listen():
+                            if event.type == VkEventType.MESSAGE_NEW and event.to_me and event.peer_id == -194070336:
+                                # Получение сообщения
+                                answer = event.message
+                                # Добавление запроса и ответа в список ответов на данный запрос для данного пользователя
+                                answers[user_id][message] = [answer]
+                                break
 
                     # Если ответ - стикер (формат: ##ID, где ID - id стикера)
                     if answer[0:2] == "##":
@@ -626,6 +636,8 @@ class Autoresponder:
             return_string = str()
             for s in all_synonyms:
                 return_string += s
+            for s in data.synonyms_stats:
+                return_string += f'USER\'S PHRASE: {s[0]}, BEST REQUEST: {s[1]}, TYPE OF FIX: {s[2]}, RATE: {s[3]}\n\n'
             return return_string
 
     @staticmethod

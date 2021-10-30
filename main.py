@@ -4,6 +4,7 @@ import sys
 import threading
 import time
 
+import requests
 import vk_api.exceptions
 
 from data import roles, save_all, users_info, game_math_stats, add_new_user
@@ -29,14 +30,7 @@ def main():
                 threading.Thread(target=async_longpoll_listen, args=[event]).start()
 
         # Обработка длительного ожидания от longpoll
-        except Exception:
-            exc_type, exc_value = sys.exc_info()[:2]
-            vk_session.method('messages.send',
-                              {'user_id': 171254367, 'message': f'\nSYSTEM_ERROR:\n'
-                                                                f'{exc_type.__name__} => {exc_value} in '
-                                                                f'{threading.current_thread().name}',
-                               'random_id': 0})
-            # raise
+        except requests.exceptions.ReadTimeout:
             pass
 
 
