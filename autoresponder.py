@@ -1,4 +1,5 @@
 import sqlite3
+import time
 
 import numpy as np
 import re
@@ -8,6 +9,7 @@ from all_games import game_math_class, game_luck_class
 from data import answers, users_info, roles, change_users_info, main_keyboard
 from pyxdameraulevenshtein import normalized_damerau_levenshtein_distance_seqs
 from transliterate import translit
+from threading import Lock
 from unicodedata import normalize, category
 from keyboard import *
 import json
@@ -17,9 +19,10 @@ import random
 
 class Autoresponder:
     """ Класс ответов на сообщения пользователей """
-    commands = {}
-    methods = {}
-    errors = {}
+    commands = None
+    methods = None
+    errors = None
+    lock = None
 
     def __init__(self):
         self.commands = {'!добавить': [self.add_response, 'Запрос\nОтвет\nОтвет\n...'],
@@ -52,6 +55,7 @@ class Autoresponder:
             'Неизвестная команда.\nУзнать список доступных команд и их синтаксис: !все команды',
             # 2
             'Неверные аргументы.\nУзнать список доступных команд и их синтаксис: !все команды', ]
+        lock = Lock()
 
     def process_event(self, event):
         """ Обработка сообщений от пользователя двух типов:
@@ -144,17 +148,25 @@ class Autoresponder:
 
                     # Если совпадений не найдено
                     else:
+                        self.lock.acquire()
+
                         # Интеграция с Марусей (id=194070336)
                         my_vk_session.method('messages.send',
                                              {'peer_id': -194070336, 'message': message, 'random_id': 0})
+                        time.sleep(2)
+                        events = my_longpoll.check()
 
-                        for event in my_longpoll.listen():
+                        self.lock.release()
+
+                        answer = str()
+                        for event in events:
                             if event.type == VkEventType.MESSAGE_NEW and event.to_me and event.peer_id == -194070336:
                                 # Получение сообщения
-                                answer = event.message
-                                # Добавление запроса и ответа в список ответов на данный запрос для данного пользователя
-                                answers[user_id][message] = [answer]
-                                break
+                                answer += f'{event.message}\n\n'
+                        # # Добавление запроса и ответа в список ответов на данный запрос для данного пользователя
+                        # answers[user_id][message] = [answer]
+
+                        answer += '\n\n(!) Этот ответ был создан автоматически и может быть не очень корректен'
 
                     # Если ответ - стикер (формат: ##ID, где ID - id стикера)
                     if answer[0:2] == "##":

@@ -126,7 +126,6 @@ def save_all(is_finally=False):
         db_cursor_save.executemany(
             'INSERT OR IGNORE INTO synonyms_stats(phrase, request, type, rate) VALUES(?, ?, ?, ?);',
             synonyms_stats)
-        print(synonyms_stats)
         synonyms_stats.clear()
 
     with open("answers.json", "w", encoding='utf-8') as write_file:
