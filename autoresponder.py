@@ -102,6 +102,12 @@ class Autoresponder:
             if user_id not in answers.keys():
                 answers[user_id] = {}
 
+            if message is None or len(message) == 0:
+                vk_session.method('messages.send',
+                                  {'user_id': int(user_id), 'message': 'Я пока что не умею читать такие сообщения :\'(', 'random_id': 0,
+                                   'keyboard': main_keyboard})
+                return
+
             # Получаем метод, с которым работает пользователь, и если он не пуст, перенаправляем сообщение в данный метод
             method = users_info.get(user_id, {}).get('method')
             if method is not None:
