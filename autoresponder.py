@@ -171,7 +171,7 @@ class Autoresponder:
                                 answer += f'{event.message}\n\n'
                         # # Добавление запроса и ответа в список ответов на данный запрос для данного пользователя
                         # answers[user_id][message] = [answer]
-
+                        answer = answer.replace('Маруся', 'ATB Bot').replace('Mail Ru', 'ATB Company').replace('Mail.Ru', 'ATB Company')
                         answer += '\n\n(!) Этот ответ был создан автоматически и может быть не очень корректен'
 
                     # Если ответ - стикер (формат: ##ID, где ID - id стикера)
