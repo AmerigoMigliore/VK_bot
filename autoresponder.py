@@ -104,8 +104,7 @@ class Autoresponder:
 
             if message is None or len(message) == 0:
                 vk_session.method('messages.send',
-                                  {'user_id': int(user_id), 'message': 'Я пока что не умею читать такие сообщения :\'(', 'random_id': 0,
-                                   'keyboard': main_keyboard})
+                                  {'user_id': int(user_id), 'message': 'Я пока что не умею читать такие сообщения :\'(', 'random_id': 0})
                 return
 
             # Получаем метод, с которым работает пользователь, и если он не пуст, перенаправляем сообщение в данный метод
@@ -131,6 +130,13 @@ class Autoresponder:
                                             ''.join(c for c in normalize('NFD', message) if category(c) != 'Mn')
                                             ).lower().strip(),
                                      flags=re.I)
+
+                    if message is None or len(message) == 0:
+                        vk_session.method('messages.send',
+                                          {'user_id': int(user_id),
+                                           'message': 'Я пока что не умею читать такие сообщения :\'(', 'random_id': 0,
+                                           'keyboard': main_keyboard})
+                        return
 
                     # Получение всех доступных синонимов
                     db_cursor.execute(f'SELECT word FROM synonyms_global')
