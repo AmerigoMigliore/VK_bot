@@ -10,7 +10,7 @@ import vk_api.exceptions
 from data import roles, save_all, users_info, game_math_stats, add_new_user
 from vk_auth import longpoll
 from autoresponder import Autoresponder
-from all_games import game_math_class, game_luck_class
+from all_games import game_math_class, game_luck_class, game_pets_class
 from vk_auth import VkBotEventType, vk_session
 
 
@@ -19,7 +19,8 @@ autoresponder_class = Autoresponder()
 all_classes = {
     'autoresponder': autoresponder_class,
     'game_math': game_math_class,
-    'game_luck': game_luck_class
+    'game_luck': game_luck_class,
+    'game_pets': game_pets_class
 }
 
 
@@ -143,6 +144,6 @@ try:
 except KeyboardInterrupt:
     raise
 finally:
-    save_all(True)
+    save_all()
     print("\033[1m\033[32m\033[40mBye!\033[0m")
     sys.exit()

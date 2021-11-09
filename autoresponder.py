@@ -5,7 +5,7 @@ import numpy as np
 import re
 
 import data
-from all_games import game_math_class, game_luck_class
+from all_games import game_math_class, game_luck_class, game_pets_class
 from data import answers, users_info, roles, change_users_info, main_keyboard
 from pyxdameraulevenshtein import normalized_damerau_levenshtein_distance_seqs
 from transliterate import translit
@@ -1014,6 +1014,11 @@ class Autoresponder:
             game_luck_class.start(str(user_id))
             return
 
+        elif arg == 'game_pets':
+            change_users_info(user_id, new_class='game_pets')
+            game_pets_class.start(str(user_id))
+            return
+
         else:
             keyboard = str(json.dumps(
                 {
@@ -1021,6 +1026,7 @@ class Autoresponder:
                     'buttons': [
                         [get_callback_button('Математика', 'positive', {'args': 'game_math'})],
                         [get_callback_button('Удача', 'positive', {'args': 'game_luck'})],
+                        [get_callback_button('Мои питомцы', 'positive', {'args': 'game_pets'})],
                         [get_callback_button("Назад", 'negative', {'args': 'back'})]
                     ]
                 },

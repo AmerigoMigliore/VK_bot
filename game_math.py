@@ -189,6 +189,7 @@ class GameMath:
                 args = event.obj.payload.get('args')
                 self.store(user_id, args)
 
+            # Сброс активированной кнопки, вызвавшей событие
             vk_session.method('messages.sendMessageEventAnswer',
                               {'event_id': event.obj.event_id,
                                'user_id': int(user_id),
@@ -374,8 +375,8 @@ class GameMath:
         random.shuffle(nums)
 
         vk_session.method('messages.send',
-                          {'user_id': int(user_id), 'message': "Уровень {}\nСколько будет {} {} {}?"
-                          .format(str(level), formula[0], symbol, formula[1]),
+                          {'user_id': int(user_id),
+                           'message': f'Уровень {str(level)}\nСколько будет {formula[0]} {symbol} {formula[1]}?',
                            'random_id': 0, 'keyboard': create_keyboard(nums)})
 
         game_math_stats.update(

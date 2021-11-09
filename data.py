@@ -1,9 +1,12 @@
 import json
+import pickle
 import threading
 import sqlite3
+
 from transliterate.discover import autodiscover
 from transliterate.base import TranslitLanguagePack, registry
 from keyboard import get_text_button
+from save_games import save_games
 
 # Вся информация о пользователях
 # id: role, class, method, args
@@ -62,6 +65,7 @@ class QWERTYLanguagePack(TranslitLanguagePack):
 
 registry.register(QWERTYLanguagePack)
 
+
 # Загрузки данных из файлов
 with open("answers.json", "r", encoding='utf-8') as read_file:
     if len(read_file.read()) == 0:
@@ -99,18 +103,18 @@ db_cursor.execute(
 db_connect.commit()
 
 db_cursor.execute('SELECT id, role, class, method, args, balance FROM users_info')
-users_info = {x[0]: {'role': x[1], 'class': x[2], 'method': x[3], 'args': x[4], 'balance': x[5]} for x in
+users_info = {x[0]: {'role': x[1], 'class': x[2], 'method': x[3], 'args': pickle.loads(x[4]), 'balance': x[5]} for x in
               db_cursor.fetchall()}  # [(id, role, class, method, args, balance), (,,,,,), ...]
 
 
-def set_next_save_all():
-    global timer
-    timer = threading.Timer(3600 * 3, save_all)
-    timer.start()
+# def set_next_save_all():
+#     global timer
+#     timer = threading.Timer(30, save_all)
+#     timer.start()
 
 
-def save_all(is_finally=False):
-    global timer
+def save_all():  # (is_finally=False):
+    # global timer
 
     db_connect_save = sqlite3.connect('all_data.db')
     db_cursor_save = db_connect_save.cursor()
@@ -118,7 +122,7 @@ def save_all(is_finally=False):
     if users_info != {}:
         db_cursor_save.executemany(
             'INSERT OR REPLACE INTO users_info(id, role, class, method, args, balance) VALUES(?, ?, ?, ?, ?, ?);',
-            [(item[0], item[1].get('role'), item[1].get('class'), item[1].get('method'), item[1].get('args'),
+            [(item[0], item[1].get('role'), item[1].get('class'), item[1].get('method'), pickle.dumps(item[1].get('args')),
               item[1].get('balance'))
              for item in users_info.items()])
 
@@ -136,11 +140,13 @@ def save_all(is_finally=False):
         json.dump({'stats': game_math_stats, 'top': game_math_top}, write_file, ensure_ascii=False)
         write_file.close()
 
-    if not is_finally:
-        set_next_save_all()
-    else:
-        if timer is not None:
-            timer.cancel()
+    save_games.save_games()
+
+    # if not is_finally:
+    #     set_next_save_all()
+    # else:
+    #     if timer is not None:
+    #         timer.cancel()
 
     db_connect_save.commit()
     db_cursor_save.close()
@@ -151,4 +157,4 @@ def save_all(is_finally=False):
           "\033[0m")
 
 
-set_next_save_all()
+# set_next_save_all()
