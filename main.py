@@ -136,6 +136,7 @@ def async_longpoll_listen(event):
                            'random_id': 0})
 
         print("Exception: ", exc)
+        pass
         # raise
 
 
