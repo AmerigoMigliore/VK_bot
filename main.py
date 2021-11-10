@@ -1,11 +1,9 @@
 # >Created by ATB<
-
+import datetime
 import sys
 import threading
-import time
 
 import requests
-import vk_api.exceptions
 
 from data import roles, save_all, users_info, game_math_stats, add_new_user
 from vk_auth import longpoll
@@ -22,6 +20,37 @@ all_classes = {
     'game_luck': game_luck_class,
     'game_pets': game_pets_class
 }
+flood_control_list = {}
+stop_list = []
+max_messages_per_min = 20
+
+
+def update_flood_control_list(user_id):
+    global stop_list
+    global max_messages_per_min
+
+    if user_id in stop_list:
+        return -1
+    if user_id in flood_control_list.keys():
+        minute = datetime.datetime.now().minute
+        flood_control_list[user_id] = [x for x in flood_control_list[user_id] if x.minute == minute]
+        flood_control_list[user_id] += [datetime.datetime.now()]
+
+        if len(flood_control_list.get(user_id)) >= max_messages_per_min:
+            stop_list += [user_id]
+            threading.Timer(10, function=del_from_stop_list, args=[user_id]).start()
+            return 0
+        else:
+            return 1
+    else:
+        flood_control_list[user_id] = [datetime.datetime.now()]
+        return 1
+
+
+def del_from_stop_list(user_id):
+    global stop_list
+    if user_id in stop_list:
+        stop_list.remove(user_id)
 
 
 def main():
@@ -32,100 +61,122 @@ def main():
 
         # Обработка длительного ожидания от longpoll
         except requests.exceptions.ReadTimeout:
-            pass
+            continue
 
 
 def async_longpoll_listen(event):
     global is_bot_active
+    global flood_control_list
     try:
-        # Обработка сообщений
-        if event.type == VkBotEventType.MESSAGE_NEW and event.from_user:
-            user_id = event.obj.from_id
-
-            # Получение сообщения
-            message = event.obj.text
-
-            if roles[users_info.get(str(user_id), {}).get('role', 'user')] >= roles['admin']:
-
-                # Рассылка для всех зарегистрированных пользователей (!рассылка#сообщение)
-                if message.split('#')[0].strip().lower() == '!рассылка':
-                    for to_id in users_info.keys():
-                        vk_session.method('messages.send',
-                                          {'user_id': to_id, 'message': message.split('#')[1].strip(),
-                                           'random_id': 0})
-
-                # Включение/выключение бота
-                if event.obj.text.lower() == "!выключить":
-                    is_bot_active = False
-                    vk_session.method('messages.send',
-                                      {'user_id': 171254367,
-                                       'message': "Бот выключен", 'random_id': 0})
-                    return
-                elif event.obj.text.lower() == "!включить":
-                    is_bot_active = True
-                    vk_session.method('messages.send',
-                                      {'user_id': 171254367,
-                                       'message': "Бот включен", 'random_id': 0})
-                    return
-
-            # Если сообщение не от администратора, проверить бота на включенность. Иначе выдать сообщение
-            elif not is_bot_active:
-                vk_session.method('messages.send',
-                                  {'user_id': user_id,
-                                   'message': "Меня тут пока что улучшают, и я не могу отвечать."
-                                              "\nПопробуй написать мне немного позднее", 'random_id': 0})
-                vk_session.method('messages.send',
-                                  {'user_id': user_id, 'random_id': 0, 'sticker_id': 18493})  # 58715
-                return
-
-            # Регистрация пользователей при первом запросе
-            if str(user_id) not in users_info.keys():
-                add_new_user(user_id)
-
-            # Основная обработка сообщений
-            all_classes.get(users_info.get(str(user_id), {}).get('class', 'autoresponder')) \
-                .process_event(event=event)
-
-        # Обработка событий
-        if event.type == VkBotEventType.MESSAGE_EVENT:
-            all_classes.get(users_info.get(str(event.obj.user_id), {}).get('class', 'autoresponder')) \
-                .process_event(event=event)
-
-        # TODO: ТЕСТИРОВАТЬ!!!
-        if event.type == VkBotEventType.VKPAY_TRANSACTION:
-            user_id = event.obj.from_id
+        if event.type == VkBotEventType.MESSAGE_NEW or event.type == VkBotEventType.MESSAGE_EVENT:
+            user_id = str(event.obj.from_id)
             if user_id is None:
-                user_id = event.obj.user_id
-            user_id = str(user_id)
+                user_id = str(event.obj.user_id)
 
-            user_info = game_math_stats.get(user_id)
-            game_math_stats.update(
-                {user_id: {'is_active': user_info.get('is_active'), 'lives': user_info.get('lives') + 5,
-                           'answer': user_info.get('answer'), 'score': user_info.get('score')}}
-            )
-            vk_session.method('messages.send',
-                              {'user_id': user_id, 'message':
-                                  "Вам начислено 5 жизней.\n"
-                                  "На данный момент у Вас жизней: {}".format(
-                                      game_math_stats.get(user_id).get('lives')),
-                               'random_id': 0})
+            n = update_flood_control_list(user_id)
+        else:
+            n = 1
+
+        if n == -1:
+            return
+        else:
+            # Обработка сообщений
+            if event.type == VkBotEventType.MESSAGE_NEW and event.from_user:
+                user_id = str(event.obj.from_id)
+
+                # Получение сообщения
+                message = event.obj.text
+
+                if roles[users_info.get(user_id, {}).get('role', 'user')] >= roles['admin']:
+
+                    # Рассылка для всех зарегистрированных пользователей (!рассылка#сообщение)
+                    if message.split('#')[0].strip().lower() == '!рассылка':
+                        for to_id in users_info.keys():
+                            vk_session.method('messages.send',
+                                              {'user_id': int(to_id), 'message': message.split('#')[1].strip(),
+                                               'random_id': 0})
+
+                    # Включение/выключение бота
+                    if event.obj.text.lower() == "!выключить":
+                        is_bot_active = False
+                        vk_session.method('messages.send',
+                                          {'user_id': 171254367,
+                                           'message': "Бот выключен", 'random_id': 0})
+                        return
+                    elif event.obj.text.lower() == "!включить":
+                        is_bot_active = True
+                        vk_session.method('messages.send',
+                                          {'user_id': 171254367,
+                                           'message': "Бот включен", 'random_id': 0})
+                        return
+
+                # Если сообщение не от администратора, проверить бота на включенность. Иначе выдать сообщение
+                elif not is_bot_active:
+                    vk_session.method('messages.send',
+                                      {'user_id': int(user_id),
+                                       'message': "Меня тут пока что улучшают, и я не могу отвечать."
+                                                  "\nПопробуй написать мне немного позднее", 'random_id': 0})
+                    vk_session.method('messages.send',
+                                      {'user_id': int(user_id), 'random_id': 0, 'sticker_id': 18493})  # 58715
+                    return
+
+                # Регистрация пользователей при первом запросе
+                if user_id not in users_info.keys():
+                    add_new_user(user_id)
+
+                # Основная обработка сообщений
+                all_classes.get(users_info.get(user_id, {}).get('class', 'autoresponder')) \
+                    .process_event(event=event)
+
+            # Обработка событий
+            if event.type == VkBotEventType.MESSAGE_EVENT:
+                user_id = str(event.obj.user_id)
+                all_classes.get(users_info.get(user_id, {}).get('class', 'autoresponder')) \
+                    .process_event(event=event)
+
+            # TODO: ТЕСТИРОВАТЬ!!!
+            if event.type == VkBotEventType.VKPAY_TRANSACTION:
+                user_id = str(event.obj.from_id)
+                if user_id is None:
+                    user_id = str(event.obj.user_id)
+
+                user_info = game_math_stats.get(user_id)
+                game_math_stats.update(
+                    {user_id: {'is_active': user_info.get('is_active'), 'lives': user_info.get('lives') + 5,
+                               'answer': user_info.get('answer'), 'score': user_info.get('score')}}
+                )
+                vk_session.method('messages.send',
+                                  {'user_id': user_id, 'message':
+                                      "Вам начислено 5 жизней.\n"
+                                      "На данный момент у Вас жизней: {}".format(
+                                          game_math_stats.get(user_id).get('lives')),
+                                   'random_id': 0})
+
+            # Отправка уведомления от Flood Control
+            if n == 0:
+                user_id = str(event.obj.from_id)
+                if user_id is None:
+                    user_id = str(event.obj.user_id)
+
+                vk_session.method('messages.send',
+                                  {'user_id': int(user_id), 'message':
+                                      "Я устал, мне нужен отдых!",
+                                   'random_id': 0})
+                vk_session.method('messages.send',
+                                  {'user_id': int(user_id), 'random_id': 0, 'sticker_id': 9425})
 
     except Exception as exc:
-        user_id = event.obj.from_id
+        user_id = str(event.obj.from_id)
         if user_id is None:
-            user_id = event.obj.user_id
-        user_id = str(user_id)
+            user_id = str(event.obj.user_id)
 
-        if exc == vk_api.exceptions.ApiError and exc.code == 9:
-            time.sleep(10)  # TODO: Оно работает?
-        else:
-            vk_session.method('messages.send',
-                              {'user_id': user_id, 'message':
-                                  "Ой, кажется, у меня что-то сломалось ;o\n"
-                                  "Но я еще работаю! Надеюсь, такого больше не повторится",
-                               'random_id': 0})
-            vk_session.method('messages.send',
-                              {'user_id': user_id, 'random_id': 0, 'sticker_id': 18467})
+        vk_session.method('messages.send',
+                          {'user_id': int(user_id), 'message':
+                              "Ой, кажется, у меня что-то сломалось ;o\n"
+                              "Но я еще работаю! Надеюсь, такого больше не повторится",
+                           'random_id': 0})
+        vk_session.method('messages.send',
+                          {'user_id': int(user_id), 'random_id': 0, 'sticker_id': 18467})
 
         exc_type, exc_value = sys.exc_info()[:2]
         vk_session.method('messages.send',
