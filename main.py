@@ -20,39 +20,34 @@ all_classes = {
     'game_luck': game_luck_class,
     'game_pets': game_pets_class
 }
-flood_control_list = {}
-stop_list = []
-max_messages_per_min = 20
+max_messages_per_min = 17
 
 
-def update_flood_control_list(user_id):
-    global stop_list
-    global max_messages_per_min
+def update_flood_control(user_id):
 
-    return 1
+    if users_info.get(user_id, {}).get('is_stopped', False):
+        return -1
+    if users_info.get(user_id, {}).get('messages_per_min') is not None:
+        minute = datetime.datetime.now().minute
+        users_info[user_id]['messages_per_min'] = [x for x in users_info.get(user_id, {}).get('messages_per_min', [])
+                                                   if x.minute == minute]
+        users_info[user_id]['messages_per_min'] += [datetime.datetime.now()]
 
-    # if user_id in stop_list:
-    #     return -1
-    # if user_id in flood_control_list.keys():
-    #     minute = datetime.datetime.now().minute
-    #     flood_control_list[user_id] = [x for x in flood_control_list[user_id] if x.minute == minute]
-    #     flood_control_list[user_id] += [datetime.datetime.now()]
-    #
-    #     if len(flood_control_list.get(user_id)) >= max_messages_per_min:
-    #         stop_list += [user_id]
-    #         threading.Timer(10, function=del_from_stop_list, args=[user_id]).start()
-    #         return 0
-    #     else:
-    #         return 1
-    # else:
-    #     flood_control_list[user_id] = [datetime.datetime.now()]
-    #     return 1
+        if len(users_info.get(user_id).get('messages_per_min')) >= max_messages_per_min:
+            users_info[user_id]['is_stopped'] = True
+            threading.Timer(10, function=del_from_stop_list, args=[user_id]).start()
+            return 0
+        else:
+            return 1
+    else:
+        if user_id in users_info.keys():
+            users_info[user_id]['messages_per_min'] = [datetime.datetime.now()]
+            users_info[user_id]['is_stopped'] = False
+        return 1
 
 
 def del_from_stop_list(user_id):
-    global stop_list
-    if user_id in stop_list:
-        stop_list.remove(user_id)
+    users_info[user_id]['is_stopped'] = False
 
 
 def main():
@@ -68,14 +63,13 @@ def main():
 
 def async_longpoll_listen(event):
     global is_bot_active
-    global flood_control_list
     try:
         if event.type == VkBotEventType.MESSAGE_NEW or event.type == VkBotEventType.MESSAGE_EVENT:
             user_id = str(event.obj.from_id)
             if user_id is None:
                 user_id = str(event.obj.user_id)
 
-            n = update_flood_control_list(user_id)
+            n = update_flood_control(user_id)
         else:
             n = 1
 
@@ -160,33 +154,34 @@ def async_longpoll_listen(event):
                 if user_id is None:
                     user_id = str(event.obj.user_id)
 
-                vk_session.method('messages.send',
-                                  {'user_id': int(user_id), 'message':
-                                      "Я устал, мне нужен отдых!",
-                                   'random_id': 0})
-                vk_session.method('messages.send',
-                                  {'user_id': int(user_id), 'random_id': 0, 'sticker_id': 9425})
+                if user_id is not None:
+                    vk_session.method('messages.send',
+                                      {'user_id': int(user_id), 'message':
+                                          "Я устал, мне нужен отдых!",
+                                       'random_id': 0})
+                    vk_session.method('messages.send',
+                                      {'user_id': int(user_id), 'random_id': 0, 'sticker_id': 9425})
 
     except Exception as exc:
         user_id = str(event.obj.from_id)
         if user_id is None:
             user_id = str(event.obj.user_id)
+        if user_id is not None:
+            vk_session.method('messages.send',
+                              {'user_id': int(user_id), 'message':
+                                  "Ой, кажется, у меня что-то сломалось ;o\n"
+                                  "Но я еще работаю! Надеюсь, такого больше не повторится",
+                               'random_id': 0})
+            vk_session.method('messages.send',
+                              {'user_id': int(user_id), 'random_id': 0, 'sticker_id': 18467})
 
-        vk_session.method('messages.send',
-                          {'user_id': int(user_id), 'message':
-                              "Ой, кажется, у меня что-то сломалось ;o\n"
-                              "Но я еще работаю! Надеюсь, такого больше не повторится",
-                           'random_id': 0})
-        vk_session.method('messages.send',
-                          {'user_id': int(user_id), 'random_id': 0, 'sticker_id': 18467})
-
-        exc_type, exc_value = sys.exc_info()[:2]
-        vk_session.method('messages.send',
-                          {'user_id': 171254367, 'message': f'FROM:\n{user_id}'
-                                                            f'\nERROR:\n'
-                                                            f'{exc_type.__name__} => {exc_value} in '
-                                                            f'{threading.current_thread().name}',
-                           'random_id': 0})
+            exc_type, exc_value = sys.exc_info()[:2]
+            vk_session.method('messages.send',
+                              {'user_id': 171254367, 'message': f'FROM:\n{user_id}'
+                                                                f'\nERROR:\n'
+                                                                f'{exc_type.__name__} => {exc_value} in '
+                                                                f'{threading.current_thread().name}',
+                               'random_id': 0})
 
         print("Exception: ", exc)
         pass
