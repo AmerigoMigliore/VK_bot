@@ -1,7 +1,7 @@
 import json
 import random
 import threading
-from data import change_users_info, main_keyboard, users_info
+from data import change_users_info, main_keyboard, users_info, tz
 from datetime import datetime, timedelta
 from keyboard import get_callback_button
 from math import floor
@@ -30,7 +30,7 @@ class GamePets:
                                            'message': answer,
                                            'random_id': 0})
                     else:
-                        pet.all_messages += [(datetime.now().strftime('%d.%m.%Y %H:%M:%S'), answer)]
+                        pet.all_messages += [(datetime.now(tz=tz).strftime('%d.%m.%Y %H:%M:%S'), answer)]
 
                     pet.action = None
                     pet.timer_action.cancel()
@@ -49,8 +49,8 @@ class GamePets:
         for pets in self.all_pets.values():
             for pet in pets:
                 pet.game_pets = self
-                if pet.time_finish_age > datetime.now():
-                    pet.timer_age = threading.Timer((pet.time_finish_age - datetime.now()).seconds, pet.next_age)
+                if pet.time_finish_age > datetime.now(tz=tz):
+                    pet.timer_age = threading.Timer((pet.time_finish_age - datetime.now(tz=tz)).seconds, pet.next_age)
                     pet.timer_age.start()
                 else:
                     pet.next_age()
@@ -450,7 +450,7 @@ class Pet(TemplatePet):
         self.age = 0
         self.timer_age = threading.Timer(self.ages[list(self.ages.keys())[self.age]], self.next_age)
         self.timer_age.start()
-        self.time_finish_age = datetime.now() + timedelta(seconds=self.ages[list(self.ages.keys())[self.age]])
+        self.time_finish_age = datetime.now(tz=tz) + timedelta(seconds=self.ages[list(self.ages.keys())[self.age]])
 
         self.lives = 100
         self.disease = None
@@ -580,7 +580,7 @@ class Pet(TemplatePet):
         self.status = f'вырос до стадии "{list(self.ages.keys())[self.age]}"'
         self.timer_age = threading.Timer(self.ages[list(self.ages.keys())[self.age]], self.next_age)
         self.timer_age.start()
-        self.time_finish_age = datetime.now() + timedelta(seconds=self.ages[list(self.ages.keys())[self.age]])
+        self.time_finish_age = datetime.now(tz=tz) + timedelta(seconds=self.ages[list(self.ages.keys())[self.age]])
 
         answer = f'Ура! {self.name} {self.status}'
         if users_info.get(self.owner_id, {}).get('args', {}) is not None and \
@@ -591,14 +591,14 @@ class Pet(TemplatePet):
                                'random_id': 0})
             self.update_actions_to_new_age()
         else:
-            self.all_messages += [(datetime.now().strftime('%d.%m.%Y %H:%M:%S'), answer)]
+            self.all_messages += [(datetime.now(tz=tz).strftime('%d.%m.%Y %H:%M:%S'), answer)]
 
     def update_actions_to_new_age(self):
         if users_info.get(self.owner_id, {}).get('method') == 'Pet.process_event.actions':
             self.actions()
 
     def get_time_to_next_age(self):
-        time = self.time_finish_age - datetime.now()
+        time = self.time_finish_age - datetime.now(tz=tz)
         if time.days == 1:
             days = 'день'
         elif 2 <= time.days <= 4:
@@ -798,10 +798,10 @@ class Pet(TemplatePet):
             return f'До завершения осталось 0 секунд'
         else:
             if self.action.startswith('работает'):
-                time = datetime.now() - self.time_finish_action
+                time = datetime.now(tz=tz) - self.time_finish_action
                 text = 'С начала прошло'
             else:
-                time = self.time_finish_action - datetime.now()
+                time = self.time_finish_action - datetime.now(tz=tz)
                 text = 'До завершения осталось'
             if time.days == 1:
                 days = 'день'
@@ -887,7 +887,7 @@ class Pet(TemplatePet):
                                'message': answer,
                                'random_id': 0})
         else:
-            self.all_messages += [(datetime.now().strftime('%d.%m.%Y %H:%M:%S'), answer)]
+            self.all_messages += [(datetime.now(tz=tz).strftime('%d.%m.%Y %H:%M:%S'), answer)]
 
     def plant_bone(self, is_finish=False):
         if is_finish:
@@ -908,7 +908,7 @@ class Pet(TemplatePet):
             self.action = 'сажает косточку'
             self.timer_action = threading.Timer(60, function=self.plant_bone, args=[True])
             self.timer_action.start()
-            self.time_finish_action = datetime.now() + timedelta(seconds=60)
+            self.time_finish_action = datetime.now(tz=tz) + timedelta(seconds=60)
             answer = f'{self.name} начал{"" if self.is_male() else "a"} сажать косточку.'
         else:
             answer = f'У {self.name} недостаточно 🍎, чтобы посадить косточку.'
@@ -926,7 +926,7 @@ class Pet(TemplatePet):
                     self.timer_action = threading.Timer(60 * 30, function=self.competition,
                                                         args=[args, True])
                     self.timer_action.start()
-                    self.time_finish_action = datetime.now() + timedelta(seconds=60 * 30)
+                    self.time_finish_action = datetime.now(tz=tz) + timedelta(seconds=60 * 30)
                     answer_ = f'{self.name} начал{"" if self.is_male() else "a"} сражаться за первое место ' \
                               f'в соревнованиях по {text_competition}'
                 else:
@@ -1040,7 +1040,7 @@ class Pet(TemplatePet):
         elif args.startswith('work.'):
             if args == 'work.finish':
                 self.action = None
-                salary = round(floor((datetime.now() - self.time_finish_action).seconds / 60) *
+                salary = round(floor((datetime.now(tz=tz) - self.time_finish_action).seconds / 60) *
                                all_works.get(self.work_name).get('salary_per_min'), 1)
 
                 answer = f'{self.name} вернул{"ся" if self.is_male() else "aсь"} с работы\n' \
@@ -1054,15 +1054,14 @@ class Pet(TemplatePet):
             else:
                 self.work_name = args.replace('work.', '')
                 self.action = f'работает ({self.work_name})'
-                self.time_finish_action = datetime.now()
+                self.time_finish_action = datetime.now(tz=tz)
                 answer = f'{self.name} начал{"" if self.is_male() else "a"} работать ({self.work_name})'
         else:
             answer = 'В настоящий момент данная работа недоступна'
 
         vk_session.method('messages.send',
-                          {'user_id': int(self.owner_id),
-                           'message': answer,
-                           'random_id': 0, 'keyboard': self.get_actions_keyboard()})
+                          {'user_id': int(self.owner_id), 'message': answer, 'random_id': 0,
+                           'keyboard': self.get_actions_keyboard()})
         return -1
 
 

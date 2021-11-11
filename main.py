@@ -5,7 +5,7 @@ import threading
 
 import requests
 
-from data import roles, save_all, users_info, game_math_stats, add_new_user
+from data import roles, save_all, users_info, game_math_stats, add_new_user, tz
 from vk_auth import longpoll
 from autoresponder import Autoresponder
 from all_games import game_math_class, game_luck_class, game_pets_class
@@ -28,10 +28,10 @@ def update_flood_control(user_id):
     if users_info.get(user_id, {}).get('is_stopped', False):
         return -1
     if users_info.get(user_id, {}).get('messages_per_min') is not None:
-        minute = datetime.datetime.now().minute
+        minute = datetime.datetime.now(tz=tz).minute
         users_info[user_id]['messages_per_min'] = [x for x in users_info.get(user_id, {}).get('messages_per_min', [])
                                                    if x.minute == minute]
-        users_info[user_id]['messages_per_min'] += [datetime.datetime.now()]
+        users_info[user_id]['messages_per_min'] += [datetime.datetime.now(tz=tz)]
 
         if len(users_info.get(user_id).get('messages_per_min')) >= max_messages_per_min:
             users_info[user_id]['is_stopped'] = True
@@ -41,7 +41,7 @@ def update_flood_control(user_id):
             return 1
     else:
         if user_id in users_info.keys():
-            users_info[user_id]['messages_per_min'] = [datetime.datetime.now()]
+            users_info[user_id]['messages_per_min'] = [datetime.datetime.now(tz=tz)]
             users_info[user_id]['is_stopped'] = False
         return 1
 
@@ -58,7 +58,9 @@ def main():
 
         # Обработка длительного ожидания от longpoll
         except requests.exceptions.ReadTimeout:
-            continue
+            pass
+        except Exception as exc:
+            print(exc)
 
 
 def async_longpoll_listen(event):

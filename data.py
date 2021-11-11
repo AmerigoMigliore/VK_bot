@@ -1,12 +1,16 @@
 import json
 import pickle
-import threading
+import datetime
 import sqlite3
 
 from transliterate.discover import autodiscover
 from transliterate.base import TranslitLanguagePack, registry
 from keyboard import get_text_button
 from save_games import save_games
+
+# Настройка часового пояса
+offset = datetime.timedelta(hours=3)
+tz = datetime.timezone(offset, name='МСК')
 
 # Вся информация о пользователях
 # id: role, class, method, args
@@ -32,8 +36,8 @@ game_math_stats = {}
 # Рейтинг в GameMath
 game_math_top = {}
 
-# Таймер для сохранения всех данных в json
-timer: threading.Timer
+# # Таймер для сохранения всех данных в json
+# timer: threading.Timer
 
 # Логи для обработки данных по синонимичному распознаванию запросов
 synonyms_stats = []
