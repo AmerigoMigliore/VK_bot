@@ -29,22 +29,24 @@ def update_flood_control_list(user_id):
     global stop_list
     global max_messages_per_min
 
-    if user_id in stop_list:
-        return -1
-    if user_id in flood_control_list.keys():
-        minute = datetime.datetime.now().minute
-        flood_control_list[user_id] = [x for x in flood_control_list[user_id] if x.minute == minute]
-        flood_control_list[user_id] += [datetime.datetime.now()]
+    return 1
 
-        if len(flood_control_list.get(user_id)) >= max_messages_per_min:
-            stop_list += [user_id]
-            threading.Timer(10, function=del_from_stop_list, args=[user_id]).start()
-            return 0
-        else:
-            return 1
-    else:
-        flood_control_list[user_id] = [datetime.datetime.now()]
-        return 1
+    # if user_id in stop_list:
+    #     return -1
+    # if user_id in flood_control_list.keys():
+    #     minute = datetime.datetime.now().minute
+    #     flood_control_list[user_id] = [x for x in flood_control_list[user_id] if x.minute == minute]
+    #     flood_control_list[user_id] += [datetime.datetime.now()]
+    #
+    #     if len(flood_control_list.get(user_id)) >= max_messages_per_min:
+    #         stop_list += [user_id]
+    #         threading.Timer(10, function=del_from_stop_list, args=[user_id]).start()
+    #         return 0
+    #     else:
+    #         return 1
+    # else:
+    #     flood_control_list[user_id] = [datetime.datetime.now()]
+    #     return 1
 
 
 def del_from_stop_list(user_id):
