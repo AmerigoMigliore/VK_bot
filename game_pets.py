@@ -163,7 +163,7 @@ class GamePets:
                           {'user_id': int(user_id),
                            'message': f'Приветствуем Вас в домике для питомцев!\n'
                                       f'У Вас {count_pets} {pets_str}\n'
-                                      f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n',
+                                      f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n',
                            'random_id': 0, 'keyboard': keyboard})
 
         change_users_info(user_id, new_method='start')
@@ -205,7 +205,7 @@ class GamePets:
                      f'1💊 - 5💰\n' \
                      f'5💊 - 20💰\n' \
                      f'10💊 - 30💰\n\n' \
-                     f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰'
+                     f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰'
         else:
             args = event.obj.payload.get('args')
             if args == 'pet':
@@ -216,7 +216,7 @@ class GamePets:
                         answer = 'Вы приобрели нового питомца. Он доступен в главном меню'
                     else:
                         answer = f'Недостаточно 💰 для покупки.\n' \
-                                 f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n' \
+                                 f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n' \
                                  f'Требуется: 10💰'
                 else:
                     answer = 'У Вас имеется максимально допустимое количество питомцев'
@@ -228,7 +228,7 @@ class GamePets:
                     answer = f'Вы приобрели 1🍎.\nВ хранилище: {self.all_foods[user_id]}🍎'
                 else:
                     answer = f'Недостаточно 💰 для покупки.\n' \
-                             f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n' \
+                             f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n' \
                              f'Требуется: 0.2💰'
             elif args == 'food_10':
                 if users_info.get(user_id, {}).get("balance", 0) >= 1.5:
@@ -237,7 +237,7 @@ class GamePets:
                     answer = f'Вы приобрели 10🍎.\nВ хранилище: {self.all_foods[user_id]}🍎'
                 else:
                     answer = f'Недостаточно 💰 для покупки.\n' \
-                             f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n' \
+                             f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n' \
                              f'Требуется: 1.5💰'
             elif args == 'food_100':
                 if users_info.get(user_id, {}).get("balance", 0) >= 10:
@@ -246,7 +246,7 @@ class GamePets:
                     answer = f'Вы приобрели 100🍎.\nВ хранилище: {self.all_foods[user_id]}🍎'
                 else:
                     answer = f'Недостаточно 💰 для покупки.\n' \
-                             f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n' \
+                             f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n' \
                              f'Требуется: 10💰'
 
             elif args == 'pill_1':
@@ -256,7 +256,7 @@ class GamePets:
                     answer = f'Вы приобрели 1💊.\nВ аптечке: {self.all_pills[user_id]}💊'
                 else:
                     answer = f'Недостаточно 💰 для покупки.\n' \
-                             f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n' \
+                             f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n' \
                              f'Требуется: 5💰'
             elif args == 'pill_5':
                 if users_info.get(user_id, {}).get("balance", 0) >= 20:
@@ -265,7 +265,7 @@ class GamePets:
                     answer = f'Вы приобрели 5💊.\nВ аптечке: {self.all_pills[user_id]}💊'
                 else:
                     answer = f'Недостаточно 💰 для покупки.\n' \
-                             f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n' \
+                             f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n' \
                              f'Требуется: 20💰'
             elif args == 'pill_10':
                 if users_info.get(user_id, {}).get("balance", 0) >= 30:
@@ -274,7 +274,7 @@ class GamePets:
                     answer = f'Вы приобрели 10💊.\nВ аптечке: {self.all_pills[user_id]}💊'
                 else:
                     answer = f'Недостаточно 💰 для покупки.\n' \
-                             f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n' \
+                             f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n' \
                              f'Требуется: 30💰'
 
             elif args == 'back':
@@ -773,7 +773,7 @@ class Pet(TemplatePet):
                     f'Имя: {self.name}\n'
                     f'Возраст: {list(self.ages.keys())[self.age]}\n'
                     f'Статус: {self.status}\n'
-                    f'Жизни: {self.lives}/100\n'
+                    f'Жизни: {round(self.lives, 1)}/100\n'
                     f'Болезнь: {"Нет" if self.disease is None else self.disease}\n'
                     f'Сытость: {self.satiety}/100\n'
                     f'Еда в кормушке: {self.food}\n\n')
@@ -785,7 +785,7 @@ class Pet(TemplatePet):
                     f'Пол: {self.sex}\n'
                     f'Тип: {self.type}\n'
                     f'Статус: {self.status}\n'
-                    f'Жизни: {self.lives}/100\n'
+                    f'Жизни: {round(self.lives, 1)}/100\n'
                     f'Болезнь: {"Нет" if self.disease is None else self.disease}\n'
                     f'Сытость: {self.satiety}/100\n'
                     f'Еда в кормушке: {self.food}\n\n'
@@ -1128,7 +1128,7 @@ class Minion:
                       f'грохнул{"ся" if self.pet.is_male() else "aсь"}, поэтому ' \
                       f'потерял{"" if self.pet.is_male() else "a"} часть урожая.\n' \
                       f'Добыто: {food - lost}🍎\n' \
-                      f'Сейчас жизней: {self.pet.lives}'
+                      f'Сейчас жизней: {round(self.pet.lives, 1)}'
         elif action == 3:
             count = random.randint(30, 50)
             if self.pet.food >= count:

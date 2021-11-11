@@ -92,7 +92,7 @@ class GameLuck:
             message = f'~Честные лотереи~\n\n' \
                       f'Выберите игру.\n' \
                       f'Для возврата выберите кнопку "Назад"' \
-                      f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n'
+                      f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n'
 
             vk_session.method('messages.send',
                               {'user_id': int(user_id), 'message': message,
@@ -133,21 +133,21 @@ class GameLuck:
                 if number == answer:
                     users_info[user_id]['balance'] += 20
                     message = f'Браво! Вы угадали мое число и выиграли 20💰!\n' \
-                              f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n'
+                              f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n'
 
                 elif (number[0] == answer[0] and (number[1] == answer[1] or number[2] == answer[2])) or \
                         (number[1] == answer[1] and number[2] == answer[2]):
                     users_info[user_id]['balance'] += 10
                     message = f'Я загадал число "{answer}".\n' \
                               f'Вы угадали 2 цифры из 3 на своих местах и выиграли 10💰\n' \
-                              f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n'
+                              f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n'
 
                 elif set(number) == set(answer) and \
                         (number[0] == answer[0] or number[1] == answer[1] or number[2] == answer[2]):
                     users_info[user_id]['balance'] += 8
                     message = f'Я загадал число "{answer}".\n' \
                               f'Вы угадали 3 цифры из 3, но только 1 на своем месте, и выиграли 8💰\n' \
-                              f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n'
+                              f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n'
 
                 elif (number[0] == answer[0] and (number[1] == answer[2] or number[2] == answer[1])) or \
                         (number[1] == answer[1] and (number[0] == answer[2] or number[2] == answer[0])) or \
@@ -155,24 +155,24 @@ class GameLuck:
                     users_info[user_id]['balance'] += 5
                     message = f'Я загадал число "{answer}".\n' \
                               f'Вы угадали 2 цифры из 3, но только 1 на своем месте, и выиграли 5💰\n' \
-                              f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n'
+                              f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n'
 
                 elif number[0] == answer[0] or number[1] == answer[1] or number[2] == answer[2]:
                     users_info[user_id]['balance'] += 3
                     message = f'Я загадал число "{answer}".\n' \
                               f'Вы угадали 1 цифру из 3 на своем месте и выиграли 3💰\n' \
-                              f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n'
+                              f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n'
 
                 elif set(number) == set(answer):
                     users_info[user_id]['balance'] += 3
                     message = f'Я загадал число "{answer}".\n' \
                               f'Вы угадали 3 цифры из 3, но ни одна не на своем месте, и выиграли 3💰\n' \
-                              f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n'
+                              f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n'
 
                 else:
                     message = f'Я загадал число "{answer}".\n' \
                               f'К сожалению, в этот раз Вы ничего не выиграли, но в следующий раз Вам обязательно повезет!\n' \
-                              f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n'
+                              f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n'
 
                 change_users_info(user_id, new_method='random_number')
 
@@ -182,7 +182,7 @@ class GameLuck:
 
             else:
                 message = f'Недостаточно 💰 для игры\n' \
-                          f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n'
+                          f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n'
                 change_users_info(user_id, new_method='random_number')
 
         else:
@@ -258,7 +258,7 @@ class GameLuck:
 
                 else:
                     message = f'Недостаточно 💰 для игры\n' \
-                              f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n'
+                              f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n'
             else:
                 return
 
@@ -294,7 +294,7 @@ class GameLuck:
                 else:
                     message += f'Увы, ни одно число не угадано.\n'
 
-                message += f'Ваш баланс: {users_info.get(user_id, {}).get("balance", 0)}💰\n'
+                message += f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n'
 
             vk_session.method('messages.edit',
                               {'peer_id': int(user_id), 'message': message,
