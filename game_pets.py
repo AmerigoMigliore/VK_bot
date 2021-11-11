@@ -49,8 +49,11 @@ class GamePets:
         for pets in self.all_pets.values():
             for pet in pets:
                 pet.game_pets = self
-                if pet.time_finish_age > datetime.now(tz=tz):
-                    pet.timer_age = threading.Timer((pet.time_finish_age - datetime.now(tz=tz)).seconds, pet.next_age)
+                if datetime.utcfromtimestamp(pet.time_finish_age.timestamp()) > datetime.utcfromtimestamp(
+                        datetime.now(tz=tz).timestamp()):
+                    pet.timer_age = threading.Timer((datetime.utcfromtimestamp(
+                        pet.time_finish_age.timestamp()) - datetime.utcfromtimestamp(
+                        datetime.now(tz=tz).timestamp())).seconds, pet.next_age)
                     pet.timer_age.start()
                 else:
                     pet.next_age()
