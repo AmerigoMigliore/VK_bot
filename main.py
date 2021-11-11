@@ -5,7 +5,7 @@ import threading
 
 import requests
 
-from data import roles, save_all, users_info, game_math_stats, add_new_user, tz
+from data import roles, save_all, users_info, game_math_stats, add_new_user, change_users_info, main_keyboard, tz
 from vk_auth import longpoll
 from autoresponder import Autoresponder
 from all_games import game_math_class, game_luck_class, game_pets_class
@@ -125,6 +125,15 @@ def async_longpoll_listen(event):
                 # Основная обработка сообщений
                 all_classes.get(users_info.get(user_id, {}).get('class', 'autoresponder')) \
                     .process_event(event=event)
+
+                # Проверка на количество непрочитанных ботом сообщений и возврат в главное меню, если их больше 1
+                if vk_session.method('messages.getConversationsById', {'peer_ids': int(user_id)}).get('items', {})[0].get('unread_count', 0) > 1:
+                    change_users_info(user_id=str(user_id), new_class='autoresponder')
+                    answer = f'Вы были перенаправлены в главное меню бота'
+                    vk_session.method('messages.send',
+                                      {'user_id': int(user_id),
+                                       'message': answer,
+                                       'random_id': 0, 'keyboard': main_keyboard})
 
             # Обработка событий
             if event.type == VkBotEventType.MESSAGE_EVENT:

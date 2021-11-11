@@ -104,7 +104,8 @@ class Autoresponder:
 
             if message is None or len(message) == 0:
                 vk_session.method('messages.send',
-                                  {'user_id': int(user_id), 'message': 'Я пока что не умею читать такие сообщения :\'(', 'random_id': 0})
+                                  {'user_id': int(user_id), 'message': 'Я пока что не умею читать такие сообщения :\'(',
+                                   'random_id': 0})
                 return
 
             # Получаем метод, с которым работает пользователь, и если он не пуст, перенаправляем сообщение в данный метод
@@ -151,7 +152,7 @@ class Autoresponder:
 
                     # Получение списка всех возможных ответов на данный запрос
                     answer = answers.get("global").get(request[0] if request is not None else None, []) + \
-                        answers.get(user_id).get(message, [])
+                             answers.get(user_id).get(message, [])
 
                     # Если найдено совпадение
                     if len(answer) != 0:
@@ -177,7 +178,8 @@ class Autoresponder:
                                 answer += f'{event.message}\n\n'
                         # # Добавление запроса и ответа в список ответов на данный запрос для данного пользователя
                         # answers[user_id][message] = [answer]
-                        answer = answer.replace('Маруся', 'ATB Bot').replace('Mail Ru', 'ATB Company').replace('Mail.Ru', 'ATB Company')
+                        answer = answer.replace('Маруся', 'ATB Bot').replace('Mail Ru', 'ATB Company').replace(
+                            'Mail.Ru', 'ATB Company')
                         answer += '\n\n(!) Этот ответ был создан автоматически и может быть не очень корректен'
 
                     # Если ответ - стикер (формат: ##ID, где ID - id стикера)
@@ -1130,23 +1132,25 @@ class Autoresponder:
 
         return command
 
-    def reset_position(self, arg, admin_id):
+    def reset_position(self, user_id, admin_id):
         admin_id = str(admin_id)
 
         if roles[users_info.get(admin_id).get('role')] < roles['admin']:
             return f'Недостаточный уровень доступа ({users_info.get(admin_id).get("role")})'
-        elif arg is None or not self.is_int(arg):
+        elif user_id is None or not self.is_int(user_id):
             return self.errors[2]
-        elif users_info.get(str(arg)) is None:
+        elif users_info.get(str(user_id)) is None:
             return 'Пользователь не найден'
         else:
-            change_users_info(user_id=str(arg), new_class='autoresponder')
+            change_users_info(user_id=str(user_id), new_class='autoresponder')
 
             user = vk_session.method('users.get', {'user_ids': int(admin_id)})[0]
             name = f"{user.get('first_name')} {user.get('last_name')}"
+            answer = f'Вы были перенаправлены в главное меню бота пользователем "{name}" ' \
+                     f'уровня "{users_info.get(admin_id).get("role")}"'
+
             vk_session.method('messages.send',
-                              {'user_id': int(arg),
-                               'message': f'Вы были перенаправлены в главное меню бота пользователем "{name}" '
-                                          f'уровня "{users_info.get(admin_id).get("role")}"',
+                              {'user_id': int(user_id),
+                               'message': answer,
                                'random_id': 0, 'keyboard': main_keyboard})
-            return f'Пользователь "{arg}" отправлен в главное меню.'
+            return f'Пользователь "{user_id}" отправлен в главное меню.'
