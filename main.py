@@ -24,6 +24,11 @@ max_messages_per_min = 17
 
 
 def update_flood_control(user_id):
+    if user_id not in users_info.keys():
+        add_new_user(user_id)
+
+    if users_info.get(user_id, {}).get('lock') is None:
+        users_info[user_id]['lock'] = threading.Lock()
 
     if users_info.get(user_id, {}).get('is_stopped', False):
         return -1
@@ -40,9 +45,8 @@ def update_flood_control(user_id):
         else:
             return 1
     else:
-        if user_id in users_info.keys():
-            users_info[user_id]['messages_per_min'] = [datetime.datetime.now(tz=tz)]
-            users_info[user_id]['is_stopped'] = False
+        users_info[user_id]['messages_per_min'] = [datetime.datetime.now(tz=tz)]
+        users_info[user_id]['is_stopped'] = False
         return 1
 
 
@@ -123,8 +127,12 @@ def async_longpoll_listen(event):
                     add_new_user(user_id)
 
                 # Основная обработка сообщений
-                all_classes.get(users_info.get(user_id, {}).get('class', 'autoresponder')) \
-                    .process_event(event=event)
+                users_info[user_id]['lock'].acquire()
+                try:
+                    all_classes.get(users_info.get(user_id, {}).get('class', 'autoresponder')) \
+                        .process_event(event=event)
+                finally:
+                    users_info[user_id]['lock'].release()
 
                 # Проверка на количество непрочитанных ботом сообщений и возврат в главное меню, если их больше 1
                 if vk_session.method('messages.getConversationsById', {'peer_ids': int(user_id)}).get('items', {})[0].get('unread_count', 0) > 1:
@@ -138,8 +146,13 @@ def async_longpoll_listen(event):
             # Обработка событий
             if event.type == VkBotEventType.MESSAGE_EVENT:
                 user_id = str(event.obj.user_id)
-                all_classes.get(users_info.get(user_id, {}).get('class', 'autoresponder')) \
-                    .process_event(event=event)
+
+                users_info[user_id]['lock'].acquire()
+                try:
+                    all_classes.get(users_info.get(user_id, {}).get('class', 'autoresponder')) \
+                        .process_event(event=event)
+                finally:
+                    users_info[user_id]['lock'].release()
 
             # TODO: ТЕСТИРОВАТЬ!!!
             if event.type == VkBotEventType.VKPAY_TRANSACTION:
