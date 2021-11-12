@@ -12,7 +12,8 @@ class GamePets:
     all_pets = {}
     all_foods = {}
     all_pills = {}
-    max_pets = 5
+    all_max_pets = {}
+    start_max_pets = 3
 
     def save_me(self):
         for pets in self.all_pets.values():
@@ -40,12 +41,14 @@ class GamePets:
                 if pet.timer_satiety is not None:
                     pet.timer_satiety.cancel()
                     pet.timer_satiety = None
-        return self.all_pets, self.all_foods, self.all_pills
+        return self.all_pets, self.all_foods, self.all_pills, self.all_max_pets
 
     def load_me(self, data):
         self.all_pets = data[0]
         self.all_foods = data[1]
         self.all_pills = data[2]
+        if len(data) >= 4:
+            self.all_max_pets = data[3]
 
         for pets in self.all_pets.values():
             for pet in pets:
@@ -68,6 +71,32 @@ class GamePets:
     def delete_pet(self, owner_id: str, pet):
         self.all_pets[owner_id].remove(pet)
 
+    def send_pets_page(self, user_id, page):
+        buttons = []
+        pets_in_page = 5
+        first = page * pets_in_page
+        last = (page + 1) * pets_in_page
+        for i, x in enumerate(self.all_pets.get(user_id, [])):
+            if first <= i < last:
+                buttons += [[get_callback_button(f'{x.name}', 'primary', {'args': 'pets.Pet', 'name': x.name})]]
+
+        menu = []
+        if page > 0:
+            menu += [get_callback_button('⬅', 'positive', {'args': f'pets.page.{page - 1}'})]
+        menu += [get_callback_button('Назад', 'negative', {'args': 'pets.back'})]
+        if last < len(self.all_pets.get(user_id, [])):
+            menu += [get_callback_button('➡', 'positive', {'args': f'pets.page.{page + 1}'})]
+
+        keyboard = str(json.dumps({
+            "one_time": False,
+            "buttons": buttons + [menu]
+        }, ensure_ascii=False))
+
+        vk_session.method('messages.send',
+                          {'user_id': int(user_id),
+                           'message': f'Страница {page + 1}',
+                           'random_id': 0, 'keyboard': keyboard})
+
     def process_event(self, event):
         if event is None:
             return
@@ -79,12 +108,18 @@ class GamePets:
             args = event.obj.payload.get('args')
 
             if method == 'start':
-                if args == 'Pet':
+                if args == 'pets':
+                    self.send_pets_page(user_id, 0)
+                elif args == 'pets.Pet':
                     change_users_info(user_id, new_method='Pet.process_event',
                                       new_args={'name': str(event.obj.payload.get('name'))})
                     for x in self.all_pets[user_id]:
                         if x.name == event.obj.payload.get('name'):
                             x.process_event(event)
+                elif args.startswith('pets.page.'):
+                    self.send_pets_page(user_id, int(args.replace('pets.page.', '')))
+                elif args == 'pets.back':
+                    self.start(user_id)
                 elif args == 'storage':
                     self.get_storage(user_id)
                 elif args == 'store':
@@ -138,6 +173,8 @@ class GamePets:
             self.all_foods[user_id] = 0
         if self.all_pills.get(user_id) is None:
             self.all_pills[user_id] = 0
+        if self.all_max_pets.get(user_id) is None:
+            self.all_max_pets[user_id] = self.start_max_pets
         count_pets = len(self.all_pets.get(user_id))
         if count_pets == 0:
             pets_str = 'питомцев'
@@ -151,9 +188,9 @@ class GamePets:
         buttons = []
         if len(self.all_pets[user_id]) > 0:
             pets_str += ':\n'
+            buttons += [[get_callback_button('Мои питомцы', 'primary', {'args': 'pets'})]]
         for x in self.all_pets[user_id]:
             pets_str += f'\n{x.get_status()}\n'
-            buttons += [[get_callback_button(f'{x.name}', 'primary', {'args': 'Pet', 'name': x.name})]]
 
         buttons += [[get_callback_button('Склад', 'secondary', {'args': 'storage'}),
                      get_callback_button('Магазин', 'secondary', {'args': 'store'})]]
@@ -177,7 +214,9 @@ class GamePets:
                           {'user_id': int(user_id),
                            'message': f'Ваш склад:\n'
                                       f'{self.all_foods.get(user_id, 0)}🍎\n'
-                                      f'{self.all_pills.get(user_id, 0)}💊',
+                                      f'{self.all_pills.get(user_id, 0)}💊\n'
+                                      f'Мест для питомцев:\n'
+                                      f'{self.all_max_pets.get(user_id, self.start_max_pets)}',
                            'random_id': 0})
 
     def store(self, user_id: str, event=None):
@@ -194,6 +233,8 @@ class GamePets:
                  get_callback_button('5💊', 'positive', {'args': 'pill_5'}),
                  get_callback_button('10💊', 'positive', {'args': 'pill_10'})],
 
+                [get_callback_button('1🧺', 'positive', {'args': 'home_1'})],
+
                 [get_callback_button('Назад', 'negative', {'args': 'back'})]
             ]
         }, ensure_ascii=False))
@@ -209,11 +250,13 @@ class GamePets:
                      f'1💊 - 5💰\n' \
                      f'5💊 - 20💰\n' \
                      f'10💊 - 30💰\n\n' \
+                     f'Дополнительное место для питомца:\n' \
+                     f'1🧺 - 50💰' \
                      f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰'
         else:
             args = event.obj.payload.get('args')
             if args == 'pet':
-                if len(self.all_pets.get(user_id)) < self.max_pets:
+                if len(self.all_pets.get(user_id)) < self.all_max_pets.get(user_id, self.start_max_pets):
                     if users_info.get(user_id, {}).get("balance", 0) >= 10:
                         users_info[user_id]["balance"] -= 10
                         self.add_pet(user_id)
@@ -281,6 +324,16 @@ class GamePets:
                              f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n' \
                              f'Требуется: 30💰'
 
+            elif args == 'home_1':
+                if users_info.get(user_id, {}).get("balance", 0) >= 50:
+                    users_info[user_id]["balance"] -= 50
+                    self.all_max_pets[user_id] += 1
+                    answer = f'Вы приобрели 1🧺.\nВсего доступно: {self.all_max_pets[user_id]}🧺'
+                else:
+                    answer = f'Недостаточно 💰 для покупки.\n' \
+                             f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n' \
+                             f'Требуется: 50💰'
+
             elif args == 'back':
                 self.start(user_id)
                 return
@@ -309,7 +362,7 @@ class TemplatePet:
     time_between_satiety = 60 * 30
 
     def __init__(self):
-        self.ages = {'Яйцо': 5, 'Младенчество': 5, 'Детство': 5, 'Юность': 5,
+        self.ages = {'Яйцо': 60 * 10, 'Младенчество': 60 * 20, 'Детство': 60 * 60 * 24, 'Юность': 60 * 60 * 24 * 2,
                      'Молодость': 60 * 60 * 24 * 7, 'Зрелость': 60 * 60 * 24 * 21, 'Старость': 0}
         self.sexes = ['Женщина', 'Мужчина']
 
@@ -1143,7 +1196,7 @@ class Minion:
             users_info[self.pet.owner_id]["balance"] -= money
             self.pet.food += food
         elif action == 1:
-            pills = random.randint(1, 5)
+            pills = random.randint(1, 3)
             answer += f'угнал{"" if self.pet.is_male() else "a"} фургон с медикаментами, но так как водить ' \
                       f'он{"" if self.pet.is_male() else "a"} не умеет, большая часть рассыпалась по дороге.\n' \
                       f'Сохранилось только {pills}💊, и все заработанное {self.pet.name} ' \
