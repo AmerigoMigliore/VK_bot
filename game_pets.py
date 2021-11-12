@@ -1,5 +1,6 @@
 import json
 import random
+import select
 import threading
 from data import change_users_info, main_keyboard, users_info, tz
 from datetime import datetime, timedelta, time as datetime_time
@@ -12,35 +13,18 @@ class GamePets:
     all_pets = {}
     all_foods = {}
     all_pills = {}
+
     all_max_pets = {}
     start_max_pets = 3
+
+    shelter = []
+    shelter_price = 1
+    market = {}
 
     def save_me(self):
         for pets in self.all_pets.values():
             for pet in pets:
-                if pet.timer_age is not None:
-                    pet.timer_age.cancel()
-                    pet.timer_age = None
-
-                if pet.timer_action is not None:
-                    if pet.action is not None:
-                        answer = f'{pet.name} не смог завершить начатое действие и вернулся домой'
-                        if users_info.get(pet.owner_id, {}).get('args', {}) is not None and \
-                                users_info.get(pet.owner_id, {}).get('args', {}).get('name', '') == pet.name:
-                            vk_session.method('messages.send',
-                                              {'user_id': int(pet.owner_id),
-                                               'message': answer,
-                                               'random_id': 0})
-                        else:
-                            pet.all_messages += [(datetime.now(tz=tz).strftime('%d.%m.%Y %H:%M:%S'), answer)]
-
-                    pet.action = None
-                    pet.timer_action.cancel()
-                    pet.timer_action = None
-
-                if pet.timer_satiety is not None:
-                    pet.timer_satiety.cancel()
-                    pet.timer_satiety = None
+                pet.stop_me()
         return self.all_pets, self.all_foods, self.all_pills, self.all_max_pets
 
     def load_me(self, data):
@@ -53,17 +37,7 @@ class GamePets:
         for pets in self.all_pets.values():
             for pet in pets:
                 pet.game_pets = self
-                if datetime.utcfromtimestamp(pet.time_finish_age.timestamp()) > datetime.utcfromtimestamp(
-                        datetime.now(tz=tz).timestamp()):
-                    pet.timer_age = threading.Timer((datetime.utcfromtimestamp(
-                        pet.time_finish_age.timestamp()) - datetime.utcfromtimestamp(
-                        datetime.now(tz=tz).timestamp())).seconds, pet.next_age)
-                    pet.timer_age.start()
-                else:
-                    pet.next_age()
-
-                pet.timer_satiety = threading.Timer(pet.time_between_satiety, pet.update_satiety)
-                pet.timer_satiety.start()
+                pet.start_me()
 
     def add_pet(self, owner_id: str):
         self.all_pets[owner_id] += [Pet(self, owner_id)]
@@ -71,21 +45,21 @@ class GamePets:
     def delete_pet(self, owner_id: str, pet):
         self.all_pets[owner_id].remove(pet)
 
-    def send_pets_page(self, user_id, page):
+    def send_pets_page(self, user_id, page, pets_list, prefix):
         buttons = []
         pets_in_page = 5
         first = page * pets_in_page
         last = (page + 1) * pets_in_page
-        for i, x in enumerate(self.all_pets.get(user_id, [])):
+        for i, x in enumerate(pets_list):
             if first <= i < last:
-                buttons += [[get_callback_button(f'{x.name}', 'primary', {'args': 'pets.Pet', 'name': x.name})]]
+                buttons += [[get_callback_button(f'{x.name}', 'primary', {'args': f'{prefix}.Pet', 'name': x.name})]]
 
         menu = []
         if page > 0:
-            menu += [get_callback_button('⬅', 'positive', {'args': f'pets.page.{page - 1}'})]
-        menu += [get_callback_button('Назад', 'negative', {'args': 'pets.back'})]
+            menu += [get_callback_button('⬅', 'positive', {'args': f'{prefix}.page.{page - 1}'})]
+        menu += [get_callback_button('Назад', 'negative', {'args': f'{prefix}.back'})]
         if last < len(self.all_pets.get(user_id, [])):
-            menu += [get_callback_button('➡', 'positive', {'args': f'pets.page.{page + 1}'})]
+            menu += [get_callback_button('➡', 'positive', {'args': f'{prefix}.page.{page + 1}'})]
 
         keyboard = str(json.dumps({
             "one_time": False,
@@ -95,6 +69,136 @@ class GamePets:
         vk_session.method('messages.send',
                           {'user_id': int(user_id),
                            'message': f'Страница {page + 1}',
+                           'random_id': 0, 'keyboard': keyboard})
+
+    def shelter_actions(self, user_id, event=None):
+        args = '' if event is None else event.obj.payload.get('args')
+
+        # Взять питомца
+        if args == 'shelter.take':
+            self.send_pets_page(user_id, 0, self.shelter, 'shelter.take')
+            return
+        elif args == 'shelter.take.Pet':
+            name = event.obj.payload.get('name')
+            answer = f'Вот информация о питомце {name}. Желаете взять его себе в домик?\n'
+            for pet in self.shelter:
+                if pet.name == name:
+                    answer += pet.get_info(True)
+                    break
+            keyboard = str(json.dumps({
+                "one_time": False,
+                "buttons": [
+                    [get_callback_button('Да', 'positive', {'args': f'shelter.take.yes.{name}'}),
+                     get_callback_button('Нет', 'negative', {'args': f'shelter.take.no'})]
+                ]
+            }, ensure_ascii=False))
+        elif args.startswith('shelter.take.yes'):
+            if users_info.get(user_id, {}).get("balance", 0) >= 20:
+                users_info[user_id]["balance"] -= 20
+
+                name = args.replace('shelter.take.yes.', '')
+                for pet in self.shelter:
+                    if pet.name == name:
+                        pet.start_me()
+                        pet.status = 'обрел нового хозяина!'
+                        pet.owner_id = user_id
+
+                        self.all_pets[user_id] += [pet]
+                        self.shelter.remove(pet)
+                        self.all_foods[user_id] += 10
+                        break
+                answer = f'Вы забрали {name} из приюта. Дарим Вам 10🍎 для обеспечения питомца в первое время.'
+
+            else:
+                answer = f'Недостаточно 💰 для покупки.\n' \
+                         f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n' \
+                         f'Требуется: 20💰'
+
+            vk_session.method('messages.send',
+                              {'user_id': int(user_id),
+                               'message': answer,
+                               'random_id': 0})
+            self.shelter_actions(user_id)
+            return
+        elif args == 'shelter.take.no':
+            self.send_pets_page(user_id, 0, self.shelter, 'shelter.take')
+            return
+        elif args.startswith('shelter.take.page.'):
+            self.send_pets_page(user_id, int(args.replace('shelter.take.page.', '')), self.shelter, 'shelter.take')
+            return
+        elif args == 'shelter.take.back':
+            self.shelter_actions(user_id)
+            return
+
+        # Отдать питомца
+        elif args == 'shelter.give':
+            self.send_pets_page(user_id, 0, self.all_pets.get(user_id, []), 'shelter.give')
+            return
+        elif args == 'shelter.give.Pet':
+            name = event.obj.payload.get('name')
+            answer = f'Уверены, что хотите отдать {name} в приют?'
+            keyboard = str(json.dumps({
+                "one_time": False,
+                "buttons": [
+                    [get_callback_button('Да', 'positive', {'args': f'shelter.give.yes.{name}'}),
+                     get_callback_button('Нет', 'negative', {'args': f'shelter.give.no'})]
+                ]
+            }, ensure_ascii=False))
+        elif args.startswith('shelter.give.yes'):
+            name = args.replace('shelter.give.yes.', '')
+            for pet in self.all_pets[user_id]:
+                if pet.name == name:
+                    pet.stop_me()
+                    pet.status = 'переехал в приют'
+
+                    new_name = name
+                    n = 1
+                    while True:
+                        for x in self.shelter:
+                            if new_name == x.name:
+                                new_name = f'{name} {n}'
+                                n += 1
+                                break
+                        else:
+                            break
+                    pet.name = new_name
+                    self.shelter += [pet]
+                    self.all_pets[user_id].remove(pet)
+                    break
+            answer = f'Вы отдали {name} в приют. Там ему будет хорошо. Обещаем!'
+            vk_session.method('messages.send',
+                              {'user_id': int(user_id),
+                               'message': answer,
+                               'random_id': 0})
+            self.shelter_actions(user_id)
+            return
+        elif args == 'shelter.give.no':
+            self.send_pets_page(user_id, 0, self.all_pets.get(user_id, []), 'shelter.give')
+            return
+        elif args.startswith('shelter.give.page.'):
+            self.send_pets_page(user_id, int(args.replace('shelter.give.page.', '')), self.all_pets.get(user_id, []), 'shelter.give')
+            return
+        elif args == 'shelter.give.back':
+            self.shelter_actions(user_id)
+            return
+        elif args == 'shelter.back':
+            self.start(user_id)
+            return
+
+        else:
+            answer = 'Выберите действие'
+            keyboard = str(json.dumps({
+                "one_time": False,
+                "buttons": [
+                    [get_callback_button('Забрать, -20💰', 'primary', {'args': 'shelter.take'}),
+                     get_callback_button('Отдать', 'secondary', {'args': 'shelter.give'})],
+                    [get_callback_button('Назад', 'negative', {'args': 'shelter.back'})]
+                ]
+            }, ensure_ascii=False))
+
+        vk_session.method('messages.send',
+                          {'user_id': int(user_id),
+                           'message': answer,
                            'random_id': 0, 'keyboard': keyboard})
 
     def process_event(self, event):
@@ -108,23 +212,33 @@ class GamePets:
             args = event.obj.payload.get('args')
 
             if method == 'start':
-                if args == 'pets':
-                    self.send_pets_page(user_id, 0)
-                elif args == 'pets.Pet':
-                    change_users_info(user_id, new_method='Pet.process_event',
-                                      new_args={'name': str(event.obj.payload.get('name'))})
-                    for x in self.all_pets[user_id]:
-                        if x.name == event.obj.payload.get('name'):
-                            x.process_event(event)
-                elif args.startswith('pets.page.'):
-                    self.send_pets_page(user_id, int(args.replace('pets.page.', '')))
-                elif args == 'pets.back':
-                    self.start(user_id)
+                if args.startswith('pets'):
+                    if args == 'pets':
+                        self.send_pets_page(user_id, 0, self.all_pets.get(user_id, []), 'pets')
+
+                    elif args == 'pets.Pet':
+                        change_users_info(user_id, new_method='Pet.process_event',
+                                          new_args={'name': str(event.obj.payload.get('name'))})
+                        for x in self.all_pets[user_id]:
+                            if x.name == event.obj.payload.get('name'):
+                                x.process_event(event)
+                                break
+
+                    elif args.startswith('pets.page.'):
+                        self.send_pets_page(user_id, int(args.replace('pets.page.', '')), self.all_pets.get(user_id, []), 'pets')
+
+                    elif args == 'pets.back':
+                        self.start(user_id)
                 elif args == 'storage':
                     self.get_storage(user_id)
                 elif args == 'store':
                     change_users_info(user_id, new_method='store')
                     self.store(user_id)
+                elif args.startswith('shelter'):
+                    if args == 'shelter':
+                        self.shelter_actions(user_id)
+                    else:
+                        self.shelter_actions(user_id, event)
                 elif args == 'back':
                     vk_session.method('messages.send',
                                       {'user_id': int(user_id),
@@ -194,6 +308,7 @@ class GamePets:
 
         buttons += [[get_callback_button('Склад', 'secondary', {'args': 'storage'}),
                      get_callback_button('Магазин', 'secondary', {'args': 'store'})]]
+        buttons += [[get_callback_button('Приют', 'secondary', {'args': 'shelter'})]]
         buttons += [[get_callback_button('Выйти из игры', 'negative', {'args': 'back'})]]
         keyboard = str(json.dumps({
             "one_time": False,
@@ -251,7 +366,7 @@ class GamePets:
                      f'5💊 - 20💰\n' \
                      f'10💊 - 30💰\n\n' \
                      f'Дополнительное место для питомца:\n' \
-                     f'1🧺 - 50💰' \
+                     f'1🧺 - 50💰\n\n' \
                      f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰'
         else:
             args = event.obj.payload.get('args')
@@ -514,6 +629,48 @@ class Pet(TemplatePet):
 
         self.satiety = 100
         self.food = 0
+
+    def stop_me(self):
+        if self.timer_age is not None:
+            self.timer_age.cancel()
+            self.timer_age = None
+
+        if self.timer_action is not None:
+            if self.action is not None:
+                if self.action.startswith('работает'):
+                    self.work('work.finish')
+                else:
+                    answer = f'{self.name} не смог завершить начатое действие и вернулся домой'
+                    if users_info.get(self.owner_id, {}).get('args', {}) is not None and \
+                            users_info.get(self.owner_id, {}).get('args', {}).get('name', '') == self.name:
+                        vk_session.method('messages.send',
+                                          {'user_id': int(self.owner_id),
+                                           'message': answer,
+                                           'random_id': 0})
+                    else:
+                        self.all_messages += [(datetime.now(tz=tz).strftime('%d.%m.%Y %H:%M:%S'), answer)]
+
+                self.action = None
+
+            self.timer_action.cancel()
+            self.timer_action = None
+
+        if self.timer_satiety is not None:
+            self.timer_satiety.cancel()
+            self.timer_satiety = None
+
+    def start_me(self):
+        if datetime.utcfromtimestamp(self.time_finish_age.timestamp()) > datetime.utcfromtimestamp(
+                datetime.now(tz=tz).timestamp()):
+            self.timer_age = threading.Timer((datetime.utcfromtimestamp(
+                self.time_finish_age.timestamp()) - datetime.utcfromtimestamp(
+                datetime.now(tz=tz).timestamp())).seconds, self.next_age)
+            self.timer_age.start()
+        else:
+            self.next_age()
+
+        self.timer_satiety = threading.Timer(self.time_between_satiety, self.update_satiety)
+        self.timer_satiety.start()
 
     def is_male(self):
         return True if self.sex == 'Мужчина' else False

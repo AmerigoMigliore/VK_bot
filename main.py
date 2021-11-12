@@ -55,6 +55,7 @@ def del_from_stop_list(user_id):
 
 
 def main():
+    sys.stderr = open(f'log.txt', 'a')
     while True:
         try:
             for event in longpoll.listen():
@@ -63,10 +64,6 @@ def main():
         # Обработка длительного ожидания от longpoll
         except requests.exceptions.ReadTimeout:
             pass
-        except Exception as exc_global:
-            with open('log.txt', 'a') as log_file_global:
-                log_file_global.write(f'{datetime.datetime.now(tz=tz)} : [GLOBAL] : {exc_global}\n\n')
-                log_file_global.close()
 
 
 def async_longpoll_listen(event):
@@ -189,9 +186,9 @@ def async_longpoll_listen(event):
                                       {'user_id': int(user_id), 'random_id': 0, 'sticker_id': 9425})
 
     except Exception as exc_longpoll:
-        user_id = str(event.obj.from_id)
+        user_id = event.obj.from_id
         if user_id is None:
-            user_id = str(event.obj.user_id)
+            user_id = event.obj.user_id
         if user_id is not None:
             vk_session.method('messages.send',
                               {'user_id': int(user_id), 'message':
@@ -209,21 +206,11 @@ def async_longpoll_listen(event):
                                                                 f'{threading.current_thread().name}',
                                'random_id': 0})
 
-        with open('log.txt', 'a') as log_file_user:
-            log_file_user.write(f'{datetime.datetime.now(tz=tz)} : [{user_id}] : {exc_longpoll}\n\n')
-            log_file_user.close()
-        pass
-        # raise
-
 
 try:
     main()
 except KeyboardInterrupt:
     raise
-except Exception as exc:
-    with open('log.txt', 'a') as log_file:
-        log_file.write(f'{datetime.datetime.now(tz=tz)} : [GLOBAL] : {exc}\n\n')
-        log_file.close()
 finally:
     save_all()
     print("\033[1m\033[32m\033[40mBye!\033[0m")

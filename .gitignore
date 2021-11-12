@@ -133,3 +133,4 @@ dmypy.json
 # Pyre type checker
 .pyre/
 /game_pets.txt
+/log.txt
