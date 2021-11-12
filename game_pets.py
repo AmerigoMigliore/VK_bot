@@ -1135,8 +1135,9 @@ class Minion:
         action = random.choice(actions)
         answer = f'{self.pet.name} '
         if action == 0:
-            money = round(random.uniform(0.5, 5), 1)
-            food = random.randint(1, int(money // 0.5))
+            money = round(random.uniform(0.5, max(5, users_info.get(self.pet.owner_id, {}).get("balance", 0) / 10)), 1)
+            price = round(random.uniform(0.0, 0.5), 2)
+            food = int(money / max(price, 0.05))
             answer += f'украл{"" if self.pet.is_male() else "a"} у Вас {money}💰 и ' \
                       f'купил{"" if self.pet.is_male() else "a"} на них {food}🍎'
             users_info[self.pet.owner_id]["balance"] -= money
