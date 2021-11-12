@@ -479,8 +479,8 @@ class Pet(TemplatePet):
 
             [get_callback_button('Время до следующей стадии', 'primary', {'args': 'get_time_to_next_age'})],
 
-            [get_callback_button('ℹ', 'primary', {'args': 'get_info_main'}),
-             get_callback_button('ℹℹℹ', 'primary', {'args': 'get_info_all'})],
+            [get_callback_button('Справка', 'primary', {'args': 'get_info_main'}),
+             get_callback_button('Информация', 'primary', {'args': 'get_info_all'})],
 
             [get_callback_button('Сменить имя', 'negative', {'args': 'set_name'}),
              get_callback_button('Назад', 'negative', {'args': 'back'})]
@@ -635,7 +635,7 @@ class Pet(TemplatePet):
                     self.game_pets.all_foods[self.owner_id] -= 1
                     self.food += 1
                     answer = f'Вы дали питомцу 1🍎.\n' \
-                             f'У него в кормушке: {self.food}🍎\n' \
+                             f'У него в кормушке: {round(self.food, 1)}🍎\n' \
                              f'У Вас в хранилище: {self.game_pets.all_foods[self.owner_id]}🍎'
                     keyboard = self.get_food_keyboard()
                 else:
@@ -646,7 +646,7 @@ class Pet(TemplatePet):
                     self.game_pets.all_foods[self.owner_id] -= 10
                     self.food += 10
                     answer = f'Вы дали питомцу 10🍎.\n' \
-                             f'У него в кормушке: {self.food}🍎\n' \
+                             f'У него в кормушке: {round(self.food, 1)}🍎\n' \
                              f'У Вас в хранилище: {self.game_pets.all_foods[self.owner_id]}🍎'
                     keyboard = self.get_food_keyboard()
                 else:
@@ -657,7 +657,7 @@ class Pet(TemplatePet):
                     self.game_pets.all_foods[self.owner_id] -= 100
                     self.food += 100
                     answer = f'Вы дали питомцу 100🍎.\n' \
-                             f'У него в кормушке: {self.food}🍎\n' \
+                             f'У него в кормушке: {round(self.food, 1)}🍎\n' \
                              f'У Вас в хранилище: {self.game_pets.all_foods[self.owner_id]}🍎'
                     keyboard = self.get_food_keyboard()
                 else:
@@ -666,7 +666,7 @@ class Pet(TemplatePet):
             elif args == 'give_food_all':
                 self.food += self.game_pets.all_foods.get(self.owner_id)
                 answer = f'Вы дали питомцу {self.game_pets.all_foods.get(self.owner_id)}🍎.\n' \
-                         f'У него в кормушке: {self.food}🍎\n' \
+                         f'У него в кормушке: {round(self.food, 1)}🍎\n' \
                          f'У Вас в хранилище: 0🍎'
                 self.game_pets.all_foods[self.owner_id] = 0
                 keyboard = self.get_food_keyboard()
@@ -677,7 +677,7 @@ class Pet(TemplatePet):
                 keyboard = self.get_main_keyboard()
             else:
                 answer = f'Выберите количество еды для питомца\n' \
-                         f'У него в кормушке: {self.food}🍎\n' \
+                         f'У него в кормушке: {round(self.food, 1)}🍎\n' \
                          f'У Вас в хранилище: {self.game_pets.all_foods[self.owner_id]}🍎'
 
         vk_session.method('messages.send',
@@ -770,7 +770,7 @@ class Pet(TemplatePet):
                     f'Имя: {self.name}\n'
                     f'Возраст: {list(self.ages.keys())[self.age]}\n'
                     f'Статус: {self.status}\n'
-                    f'Еда в кормушке: {self.food}\n\n')
+                    f'Еда в кормушке: {round(self.food, 1)}\n\n')
         elif not is_all:
             return (f'\n'
                     f'~Информация о питомце~\n'
@@ -780,7 +780,7 @@ class Pet(TemplatePet):
                     f'Жизни: {round(self.lives, 1)}/100\n'
                     f'Болезнь: {"Нет" if self.disease is None else self.disease}\n'
                     f'Сытость: {self.satiety}/100\n'
-                    f'Еда в кормушке: {self.food}\n\n')
+                    f'Еда в кормушке: {round(self.food, 1)}\n\n')
         else:
             return (f'\n'
                     f'~Информация о питомце~\n'
@@ -792,7 +792,7 @@ class Pet(TemplatePet):
                     f'Жизни: {round(self.lives, 1)}/100\n'
                     f'Болезнь: {"Нет" if self.disease is None else self.disease}\n'
                     f'Сытость: {self.satiety}/100\n'
-                    f'Еда в кормушке: {self.food}\n\n'
+                    f'Еда в кормушке: {round(self.food, 1)}\n\n'
 
                     f'Характеристики:\n'
                     f'{self.get_string_features(self.features)}')
@@ -920,7 +920,7 @@ class Pet(TemplatePet):
         else:
             answer = f'У {self.name} недостаточно 🍎, чтобы посадить косточку.'
         answer += f'\nВсего посажено {self.bones}🌳\n' \
-                  f'Они приносят {self.bones * self.food_from_bone}🍎/{int(self.time_between_satiety / 60)}мин'
+                  f'Они приносят {round(self.bones * self.food_from_bone, 1)}🍎/{int(self.time_between_satiety / 60)}мин'
 
         return answer
 
@@ -938,7 +938,7 @@ class Pet(TemplatePet):
                               f'в соревнованиях по {text_competition}'
                 else:
                     answer_ = f'Недостаточно 💰 для вступительного взноса.\n' \
-                              f'Ваш баланс: {users_info.get(self.owner_id, {}).get("balance", 0)}💰\n' \
+                              f'Ваш баланс: {round(users_info.get(self.owner_id, {}).get("balance", 0), 1)}💰\n' \
                               f'Требуется: 0.5💰'
             else:
                 if random.randint(1, 110) <= success:
@@ -974,7 +974,7 @@ class Pet(TemplatePet):
                      }, ensure_ascii=False))
             else:
                 answer = f'Недостаточно 💰 для вступительного взноса.\n' \
-                         f'Ваш баланс: {users_info.get(self.owner_id, {}).get("balance", 0)}💰\n' \
+                         f'Ваш баланс: {round(users_info.get(self.owner_id, {}).get("balance", 0), 1)}💰\n' \
                          f'Требуется: 0.5💰'
             vk_session.method('messages.send',
                               {'user_id': int(self.owner_id),
