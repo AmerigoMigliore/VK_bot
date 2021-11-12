@@ -331,7 +331,7 @@ class GamePets:
                                       f'{self.all_foods.get(user_id, 0)}🍎\n'
                                       f'{self.all_pills.get(user_id, 0)}💊\n'
                                       f'Мест для питомцев:\n'
-                                      f'{self.all_max_pets.get(user_id, self.start_max_pets)}',
+                                      f'{self.all_max_pets.get(user_id, self.start_max_pets)}🧺',
                            'random_id': 0})
 
     def store(self, user_id: str, event=None):
