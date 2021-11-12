@@ -27,7 +27,7 @@ def update_flood_control(user_id):
     if user_id not in users_info.keys():
         add_new_user(user_id)
 
-    if users_info.get(user_id, {}).get('lock') is None:
+    if users_info.get(user_id).get('lock') is None:
         users_info[user_id]['lock'] = threading.Lock()
 
     if users_info.get(user_id, {}).get('is_stopped', False):
@@ -63,8 +63,10 @@ def main():
         # Обработка длительного ожидания от longpoll
         except requests.exceptions.ReadTimeout:
             pass
-        except Exception as exc:
-            print(exc)
+        except Exception as exc_global:
+            with open('log.txt', 'a') as log_file_global:
+                log_file_global.write(f'{datetime.datetime.now(tz=tz)} : [GLOBAL] : {exc_global}\n\n')
+                log_file_global.close()
 
 
 def async_longpoll_listen(event):
@@ -186,7 +188,7 @@ def async_longpoll_listen(event):
                     vk_session.method('messages.send',
                                       {'user_id': int(user_id), 'random_id': 0, 'sticker_id': 9425})
 
-    except Exception as exc:
+    except Exception as exc_longpoll:
         user_id = str(event.obj.from_id)
         if user_id is None:
             user_id = str(event.obj.user_id)
@@ -207,7 +209,9 @@ def async_longpoll_listen(event):
                                                                 f'{threading.current_thread().name}',
                                'random_id': 0})
 
-        print("Exception: ", exc)
+        with open('log.txt', 'a') as log_file_user:
+            log_file_user.write(f'{datetime.datetime.now(tz=tz)} : [{user_id}] : {exc_longpoll}\n\n')
+            log_file_user.close()
         pass
         # raise
 
@@ -216,6 +220,10 @@ try:
     main()
 except KeyboardInterrupt:
     raise
+except Exception as exc:
+    with open('log.txt', 'a') as log_file:
+        log_file.write(f'{datetime.datetime.now(tz=tz)} : [GLOBAL] : {exc}\n\n')
+        log_file.close()
 finally:
     save_all()
     print("\033[1m\033[32m\033[40mBye!\033[0m")

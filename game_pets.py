@@ -2,7 +2,7 @@ import json
 import random
 import threading
 from data import change_users_info, main_keyboard, users_info, tz
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time as datetime_time
 from keyboard import get_callback_button
 from math import floor
 from vk_auth import vk_session, VkBotEventType
@@ -22,15 +22,16 @@ class GamePets:
                     pet.timer_age = None
 
                 if pet.timer_action is not None:
-                    answer = f'{pet.name} не смог завершить начатое действие и вернулся домой'
-                    if users_info.get(pet.owner_id, {}).get('args', {}) is not None and \
-                            users_info.get(pet.owner_id, {}).get('args', {}).get('name', '') == pet.name:
-                        vk_session.method('messages.send',
-                                          {'user_id': int(pet.owner_id),
-                                           'message': answer,
-                                           'random_id': 0})
-                    else:
-                        pet.all_messages += [(datetime.now(tz=tz).strftime('%d.%m.%Y %H:%M:%S'), answer)]
+                    if pet.action is not None:
+                        answer = f'{pet.name} не смог завершить начатое действие и вернулся домой'
+                        if users_info.get(pet.owner_id, {}).get('args', {}) is not None and \
+                                users_info.get(pet.owner_id, {}).get('args', {}).get('name', '') == pet.name:
+                            vk_session.method('messages.send',
+                                              {'user_id': int(pet.owner_id),
+                                               'message': answer,
+                                               'random_id': 0})
+                        else:
+                            pet.all_messages += [(datetime.now(tz=tz).strftime('%d.%m.%Y %H:%M:%S'), answer)]
 
                     pet.action = None
                     pet.timer_action.cancel()
@@ -308,9 +309,8 @@ class TemplatePet:
     time_between_satiety = 60 * 30
 
     def __init__(self):
-        # in seconds 60, 60 * 60, 60 * 60 * 5, 60 * 60 * 24
-        self.ages = {'Яйцо': 60 * 5, 'Младенчество': 60 * 10, 'Детство': 60 * 60 * 5, 'Юность': 60 * 60 * 24,
-                     'Молодость': 60 * 60 * 24 * 3, 'Зрелость': 60 * 60 * 24 * 7, 'Старость': 0}
+        self.ages = {'Яйцо': 5, 'Младенчество': 5, 'Детство': 5, 'Юность': 5,
+                     'Молодость': 60 * 60 * 24 * 7, 'Зрелость': 60 * 60 * 24 * 21, 'Старость': 0}
         self.sexes = ['Женщина', 'Мужчина']
 
         # health=0, intellect=0, power=0, speed=0, industriousness=0, neatness=0, luck=0, work_time_night=False
@@ -404,6 +404,7 @@ class Pet(TemplatePet):
     action = None
     work_name: str
     timer_action = None
+    time_start_action: datetime
     time_finish_action: datetime
 
     bones = 0
@@ -801,7 +802,7 @@ class Pet(TemplatePet):
             return f'До завершения осталось 0 секунд'
         else:
             if self.action.startswith('работает'):
-                time = datetime.now(tz=tz) - self.time_finish_action
+                time = datetime.now(tz=tz) - self.time_start_action
                 text = 'С начала прошло'
             else:
                 time = self.time_finish_action - datetime.now(tz=tz)
@@ -881,14 +882,16 @@ class Pet(TemplatePet):
                                'message': answer,
                                'random_id': 0, 'keyboard': keyboard})
 
-    def finish_action(self, answer):
-        self.action = None
+    def send_message_action(self, answer):
         if users_info.get(self.owner_id, {}).get('args', {}) is not None and \
                 users_info.get(self.owner_id, {}).get('args', {}).get('name', '') == self.name:
+
+            if users_info.get(self.owner_id).get('method') == 'Pet.process_event.actions':
+                keyboard = self.get_actions_keyboard()
+            else:
+                keyboard = None
             vk_session.method('messages.send',
-                              {'user_id': int(self.owner_id),
-                               'message': answer,
-                               'random_id': 0})
+                              {'user_id': int(self.owner_id), 'message': answer, 'random_id': 0, 'keyboard': keyboard})
         else:
             self.all_messages += [(datetime.now(tz=tz).strftime('%d.%m.%Y %H:%M:%S'), answer)]
 
@@ -901,8 +904,9 @@ class Pet(TemplatePet):
             else:
                 answer = f'{self.name} посадил{"" if self.is_male() else "a"} косточку, но она не прижилась.'
             answer += f'\nВсего посажено {self.bones}🌳\n' \
-                      f'Они приносят {self.bones * self.food_from_bone}🍎/{int(self.time_between_satiety / 60)}мин'
-            self.finish_action(answer)
+                      f'Они приносят {round(self.bones * self.food_from_bone, 1)}🍎/{int(self.time_between_satiety / 60)}мин'
+            self.action = None
+            self.send_message_action(answer)
             return
         elif self.bones >= self.max_bones:
             answer = f'{self.name} посадил{"" if self.is_male() else "a"} максимально возможное количество 🌳.'
@@ -998,7 +1002,8 @@ class Pet(TemplatePet):
             return answer
 
         if is_finish:
-            self.finish_action(go())
+            self.action = None
+            self.send_message_action(go())
             return -1
         vk_session.method('messages.send',
                           {'user_id': int(self.owner_id),
@@ -1011,61 +1016,85 @@ class Pet(TemplatePet):
             self.actions()
             return -1
 
-        all_works = {**self.works, **self.identified_pet.works}
-        if args == 'work':
-            buttons = []
-            for work_name in list(all_works.keys()):
-                skills = all_works.get(work_name).get('skills')
-                for skill in list(skills.keys()):
-                    if skills.get(skill) > self.features.get(skill):
-                        break
-                else:
-                    buttons += [[get_callback_button(
-                        f'{work_name}, '
-                        f'{all_works.get(work_name).get("salary_per_min")}'
-                        f'{"💰" if all_works.get(work_name).get("salary_in") == "money" else "🍎"} в мин',
-                        'primary', {'args': f'work.{work_name}'}
-                    )]]
-
-            if not buttons:
-                answer = f'Нет доступных работ для {self.name}'
-                keyboard = None
-            else:
-                buttons += [[get_callback_button('Назад', 'negative', {'args': 'work.back'})]]
-                answer = f'Доступные работы для {self.name}'
-                keyboard = str(json.dumps({"one_time": True, "buttons": buttons}, ensure_ascii=False))
-
-            vk_session.method('messages.send',
-                              {'user_id': int(self.owner_id),
-                               'message': answer,
-                               'random_id': 0, 'keyboard': keyboard})
+        if (self.features.get('work_time_night') and
+                datetime_time(hour=9) <= datetime.now(tz=tz).time() < datetime_time(hour=21)):
+            self.action = None
+            self.send_message_action(f'{self.name} работает только с 21:00 до 9:00')
             return -1
-        elif args.startswith('work.'):
-            if args == 'work.finish':
-                self.action = None
-                salary = round(floor((datetime.now(tz=tz) - self.time_finish_action).seconds / 60) *
-                               all_works.get(self.work_name).get('salary_per_min'), 1)
-
-                answer = f'{self.name} вернул{"ся" if self.is_male() else "aсь"} с работы\n' \
-                         f'Заработано: {salary}'
-                if all_works.get(self.work_name).get('salary_in') == 'money':
-                    users_info[self.owner_id]["balance"] += salary
-                    answer += '💰'
-                else:
-                    self.food += salary
-                    answer += '🍎'
-            else:
-                self.work_name = args.replace('work.', '')
-                self.action = f'работает ({self.work_name})'
-                self.time_finish_action = datetime.now(tz=tz)
-                answer = f'{self.name} начал{"" if self.is_male() else "a"} работать ({self.work_name})'
+        elif (not self.features.get('work_time_night') and
+              (datetime_time(hour=21) <= datetime.now(tz=tz).time() <= datetime_time(hour=23, minute=59, second=59) or
+               datetime_time(hour=0) <= datetime.now(tz=tz).time() < datetime_time(hour=9))):
+            self.action = None
+            self.send_message_action(f'{self.name} работает только с 9:00 до 21:00')
+            return -1
         else:
-            answer = 'В настоящий момент данная работа недоступна'
+            all_works = {**self.works, **self.identified_pet.works}
+            if args == 'work':
+                buttons = []
+                for work_name in list(all_works.keys()):
+                    skills = all_works.get(work_name).get('skills')
+                    for skill in list(skills.keys()):
+                        if skills.get(skill) > self.features.get(skill):
+                            break
+                    else:
+                        buttons += [[get_callback_button(
+                            f'{work_name}, '
+                            f'{all_works.get(work_name).get("salary_per_min")}'
+                            f'{"💰" if all_works.get(work_name).get("salary_in") == "money" else "🍎"} в мин',
+                            'primary', {'args': f'work.{work_name}'}
+                        )]]
 
-        vk_session.method('messages.send',
-                          {'user_id': int(self.owner_id), 'message': answer, 'random_id': 0,
-                           'keyboard': self.get_actions_keyboard()})
-        return -1
+                if not buttons:
+                    answer = f'Нет доступных работ для {self.name}'
+                    keyboard = None
+                else:
+                    buttons += [[get_callback_button('Назад', 'negative', {'args': 'work.back'})]]
+                    answer = f'Доступные работы для {self.name}'
+                    keyboard = str(json.dumps({"one_time": True, "buttons": buttons}, ensure_ascii=False))
+
+                vk_session.method('messages.send',
+                                  {'user_id': int(self.owner_id),
+                                   'message': answer,
+                                   'random_id': 0, 'keyboard': keyboard})
+                return -1
+            elif args.startswith('work.'):
+                if args == 'work.finish':
+                    self.action = None
+                    self.timer_action.cancel()
+                    salary = round(floor((datetime.now(tz=tz) - self.time_start_action).seconds / 60) *
+                                   all_works.get(self.work_name).get('salary_per_min'), 1)
+
+                    answer = f'{self.name} вернул{"ся" if self.is_male() else "aсь"} с работы\n' \
+                             f'Заработано: {salary}'
+                    if all_works.get(self.work_name).get('salary_in') == 'money':
+                        users_info[self.owner_id]["balance"] += salary
+                        answer += '💰'
+                    else:
+                        self.food += salary
+                        answer += '🍎'
+                else:
+                    self.work_name = args.replace('work.', '')
+                    self.action = f'работает ({self.work_name})'
+                    self.time_start_action = datetime.now(tz=tz)
+
+                    now = datetime.now(tz=tz)
+                    if self.features.get('work_time_night'):
+                        self.time_finish_action = datetime(year=now.year, month=now.month, day=now.day, hour=9,
+                                                           tzinfo=tz)
+                        if now.time() <= datetime_time(hour=23, minute=59, second=59):
+                            self.time_finish_action += timedelta(days=1)
+                    else:
+                        self.time_finish_action = datetime(year=now.year, month=now.month, day=now.day, hour=21,
+                                                           tzinfo=tz)
+                    self.timer_action = threading.Timer((self.time_finish_action - now).seconds,
+                                                        function=self.work, args=['work.finish'])
+                    self.timer_action.start()
+                    answer = f'{self.name} начал{"" if self.is_male() else "a"} работать ({self.work_name})'
+            else:
+                answer = 'В настоящий момент данная работа недоступна'
+
+            self.send_message_action(answer)
+            return -1
 
 
 class Minion:

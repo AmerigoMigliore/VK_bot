@@ -2,6 +2,7 @@ import json
 import pickle
 import datetime
 import sqlite3
+import threading
 
 from transliterate.discover import autodiscover
 from transliterate.base import TranslitLanguagePack, registry
@@ -51,7 +52,8 @@ def change_users_info(user_id, new_class=None, new_method=None, new_args=None):
 
 
 def add_new_user(user_id):
-    users_info[str(user_id)] = {'role': 'user', 'class': 'autoresponder', 'method': None, 'args': None, 'balance': 0}
+    users_info[str(user_id)] = {'role': 'user', 'class': 'autoresponder', 'method': None, 'args': None, 'balance': 0,
+                                'lock': threading.Lock()}
 
 
 # Регистрация транслитерации по раскладке клавиатуры
@@ -107,7 +109,7 @@ db_cursor.execute(
 db_connect.commit()
 
 db_cursor.execute('SELECT id, role, class, method, args, balance FROM users_info')
-users_info = {x[0]: {'role': x[1], 'class': x[2], 'method': x[3], 'args': pickle.loads(x[4]), 'balance': x[5]} for x in
+users_info = {x[0]: {'role': x[1], 'class': x[2], 'method': x[3], 'args': pickle.loads(x[4]), 'balance': x[5], 'lock': threading.Lock()} for x in
               db_cursor.fetchall()}  # [(id, role, class, method, args, balance), (,,,,,), ...]
 
 
