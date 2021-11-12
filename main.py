@@ -190,13 +190,13 @@ def async_longpoll_listen(event):
         if user_id is None:
             user_id = event.obj.user_id
         if user_id is not None:
-            vk_session.method('messages.send',
-                              {'user_id': int(user_id), 'message':
-                                  "Ой, кажется, у меня что-то сломалось ;o\n"
-                                  "Но я еще работаю! Надеюсь, такого больше не повторится",
-                               'random_id': 0})
-            vk_session.method('messages.send',
-                              {'user_id': int(user_id), 'random_id': 0, 'sticker_id': 18467})
+            # vk_session.method('messages.send',
+            #                   {'user_id': int(user_id), 'message':
+            #                       "Ой, кажется, у меня что-то сломалось ;o\n"
+            #                       "Но я еще работаю! Надеюсь, такого больше не повторится",
+            #                    'random_id': 0})
+            # vk_session.method('messages.send',
+            #                   {'user_id': int(user_id), 'random_id': 0, 'sticker_id': 18467})
 
             exc_type, exc_value = sys.exc_info()[:2]
             vk_session.method('messages.send',
