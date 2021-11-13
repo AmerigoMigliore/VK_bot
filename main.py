@@ -155,9 +155,10 @@ def async_longpoll_listen(event):
 
             # TODO: ТЕСТИРОВАТЬ!!!
             if event.type == VkBotEventType.VKPAY_TRANSACTION:
-                user_id = str(event.obj.from_id)
+                user_id = event.obj.from_id
                 if user_id is None:
-                    user_id = str(event.obj.user_id)
+                    user_id = event.obj.user_id
+                user_id = str(user_id)
 
                 user_info = game_math_stats.get(user_id)
                 game_math_stats.update(
@@ -173,10 +174,9 @@ def async_longpoll_listen(event):
 
             # Отправка уведомления от Flood Control
             if n == 0:
-                user_id = str(event.obj.from_id)
+                user_id = event.obj.from_id
                 if user_id is None:
-                    user_id = str(event.obj.user_id)
-
+                    user_id = event.obj.user_id
                 if user_id is not None:
                     vk_session.method('messages.send',
                                       {'user_id': int(user_id), 'message':
@@ -190,13 +190,13 @@ def async_longpoll_listen(event):
         if user_id is None:
             user_id = event.obj.user_id
         if user_id is not None:
-            # vk_session.method('messages.send',
-            #                   {'user_id': int(user_id), 'message':
-            #                       "Ой, кажется, у меня что-то сломалось ;o\n"
-            #                       "Но я еще работаю! Надеюсь, такого больше не повторится",
-            #                    'random_id': 0})
-            # vk_session.method('messages.send',
-            #                   {'user_id': int(user_id), 'random_id': 0, 'sticker_id': 18467})
+            vk_session.method('messages.send',
+                              {'user_id': int(user_id), 'message':
+                                  "Ой, кажется, у меня что-то сломалось ;o\n"
+                                  "Но я еще работаю! Надеюсь, такого больше не повторится",
+                               'random_id': 0})
+            vk_session.method('messages.send',
+                              {'user_id': int(user_id), 'random_id': 0, 'sticker_id': 18467})
 
             exc_type, exc_value = sys.exc_info()[:2]
             vk_session.method('messages.send',
@@ -205,6 +205,7 @@ def async_longpoll_listen(event):
                                                                 f'{exc_type.__name__} => {exc_value} in '
                                                                 f'{threading.current_thread().name}',
                                'random_id': 0})
+        raise exc_longpoll
 
 
 try:
