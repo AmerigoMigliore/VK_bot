@@ -105,6 +105,19 @@ class GamePets:
                 for pet in self.shelter:
                     if pet.name == name:
                         pet.start_me()
+
+                        new_name = name
+                        n = 1
+                        while True:
+                            for x in self.all_pets.get(user_id):
+                                if new_name == x.name:
+                                    new_name = f'{name} {n}'
+                                    n += 1
+                                    break
+                            else:
+                                break
+                        pet.name = new_name
+
                         pet.status = 'обрел нового хозяина!'
                         pet.owner_id = user_id
 
@@ -331,6 +344,8 @@ class GamePets:
                            'random_id': 0})
 
     def store(self, user_id: str, event=None):
+        prices = {'pet': 10, 'food_1': 0.2, 'food_10': 1.5, 'food_100': 10, 'pill_1': 5, 'pill_5': 20, 'pill_10': 30,
+                  'home_1': 50}
         keyboard = str(json.dumps({
             "one_time": False,
             "buttons": [
@@ -352,98 +367,69 @@ class GamePets:
         if event is None:
             answer = f'Добро пожаловать в магазин "Все для питомцев"!\nВыберите желаемый товар:\n\n' \
                      f'Яйцо с питомцем:\n' \
-                     f'1🐣 - 10💰\n\n' \
+                     f'1🐣 - {prices.get("pet")}💰\n\n' \
                      f'Еда для питомца:\n' \
-                     f'1🍎 - 0.2💰\n' \
-                     f'10🍎 - 1.5💰\n' \
-                     f'100🍎 - 10💰\n\n' \
+                     f'1🍎 - {prices.get("food_1")}💰\n' \
+                     f'10🍎 - {prices.get("food_10")}💰\n' \
+                     f'100🍎 - {prices.get("food_100")}💰\n\n' \
                      f'Лекарство для питомца:\n' \
-                     f'1💊 - 5💰\n' \
-                     f'5💊 - 20💰\n' \
-                     f'10💊 - 30💰\n\n' \
+                     f'1💊 - {prices.get("pill_1")}💰\n' \
+                     f'5💊 - {prices.get("pill_5")}💰\n' \
+                     f'10💊 - {prices.get("pill_10")}💰\n\n' \
                      f'Дополнительное место для питомца:\n' \
-                     f'1🧺 - 50💰\n\n' \
+                     f'1🧺 - {prices.get("home_1")}💰\n\n' \
                      f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰'
         else:
             args = event.obj.payload.get('args')
             if args == 'pet':
                 if len(self.all_pets.get(user_id)) < self.all_max_pets.get(user_id, self.start_max_pets):
-                    if users_info.get(user_id, {}).get("balance", 0) >= 10:
-                        users_info[user_id]["balance"] -= 10
+                    if users_info.get(user_id, {}).get("balance", 0) >= prices.get("pet"):
+                        users_info[user_id]["balance"] -= prices.get("pet")
                         self.add_pet(user_id)
-                        answer = 'Вы приобрели нового питомца. Он доступен в главном меню'
+                        answer = f'Вы приобрели нового питомца. Он доступен в главном меню' \
+                                 f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n'
                     else:
                         answer = f'Недостаточно 💰 для покупки.\n' \
                                  f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n' \
-                                 f'Требуется: 10💰'
+                                 f'Требуется: {prices.get("pet")}💰'
                 else:
                     answer = 'У Вас имеется максимально допустимое количество питомцев'
 
-            elif args == 'food_1':
-                if users_info.get(user_id, {}).get("balance", 0) >= 0.2:
-                    users_info[user_id]["balance"] -= 0.2
-                    self.all_foods[user_id] += 1
-                    answer = f'Вы приобрели 1🍎.\nВ хранилище: {self.all_foods[user_id]}🍎'
+            elif args.startswith('food_'):
+                food = int(args.replace('food_', ''))
+                if users_info.get(user_id, {}).get("balance", 0) >= prices.get(args):
+                    users_info[user_id]["balance"] -= prices.get(args)
+                    self.all_foods[user_id] += food
+                    answer = f'Вы приобрели {food}🍎.\n' \
+                             f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n' \
+                             f'В хранилище: {self.all_foods[user_id]}🍎'
                 else:
                     answer = f'Недостаточно 💰 для покупки.\n' \
                              f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n' \
-                             f'Требуется: 0.2💰'
-            elif args == 'food_10':
-                if users_info.get(user_id, {}).get("balance", 0) >= 1.5:
-                    users_info[user_id]["balance"] -= 1.5
-                    self.all_foods[user_id] += 10
-                    answer = f'Вы приобрели 10🍎.\nВ хранилище: {self.all_foods[user_id]}🍎'
-                else:
-                    answer = f'Недостаточно 💰 для покупки.\n' \
-                             f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n' \
-                             f'Требуется: 1.5💰'
-            elif args == 'food_100':
-                if users_info.get(user_id, {}).get("balance", 0) >= 10:
-                    users_info[user_id]["balance"] -= 10
-                    self.all_foods[user_id] += 100
-                    answer = f'Вы приобрели 100🍎.\nВ хранилище: {self.all_foods[user_id]}🍎'
-                else:
-                    answer = f'Недостаточно 💰 для покупки.\n' \
-                             f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n' \
-                             f'Требуется: 10💰'
+                             f'Требуется: {prices.get(args)}💰'
 
-            elif args == 'pill_1':
-                if users_info.get(user_id, {}).get("balance", 0) >= 5:
-                    users_info[user_id]["balance"] -= 5
-                    self.all_pills[user_id] += 1
-                    answer = f'Вы приобрели 1💊.\nВ аптечке: {self.all_pills[user_id]}💊'
+            elif args.startswith('pill_'):
+                pill = int(args.replace('pill_', ''))
+                if users_info.get(user_id, {}).get("balance", 0) >= prices.get(args):
+                    users_info[user_id]["balance"] -= prices.get(args)
+                    self.all_pills[user_id] += pill
+                    answer = f'Вы приобрели {pill}💊.\n' \
+                             f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n' \
+                             f'В аптечке: {self.all_pills[user_id]}💊'
                 else:
                     answer = f'Недостаточно 💰 для покупки.\n' \
                              f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n' \
                              f'Требуется: 5💰'
-            elif args == 'pill_5':
-                if users_info.get(user_id, {}).get("balance", 0) >= 20:
-                    users_info[user_id]["balance"] -= 20
-                    self.all_pills[user_id] += 5
-                    answer = f'Вы приобрели 5💊.\nВ аптечке: {self.all_pills[user_id]}💊'
-                else:
-                    answer = f'Недостаточно 💰 для покупки.\n' \
-                             f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n' \
-                             f'Требуется: 20💰'
-            elif args == 'pill_10':
-                if users_info.get(user_id, {}).get("balance", 0) >= 30:
-                    users_info[user_id]["balance"] -= 30
-                    self.all_pills[user_id] += 10
-                    answer = f'Вы приобрели 10💊.\nВ аптечке: {self.all_pills[user_id]}💊'
-                else:
-                    answer = f'Недостаточно 💰 для покупки.\n' \
-                             f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n' \
-                             f'Требуется: 30💰'
 
             elif args == 'home_1':
-                if users_info.get(user_id, {}).get("balance", 0) >= 50:
-                    users_info[user_id]["balance"] -= 50
+                if users_info.get(user_id, {}).get("balance", 0) >= prices.get(args):
+                    users_info[user_id]["balance"] -= prices.get(args)
                     self.all_max_pets[user_id] += 1
                     answer = f'Вы приобрели 1🧺.\nВсего доступно: {self.all_max_pets[user_id]}🧺'
                 else:
                     answer = f'Недостаточно 💰 для покупки.\n' \
                              f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n' \
-                             f'Требуется: 50💰'
+                             f'Требуется: {prices.get(args)}💰'
 
             elif args == 'back':
                 self.start(user_id)
@@ -568,7 +554,8 @@ class Pet(TemplatePet):
     food: int
 
     identified_pet = None
-    features: dict
+    features_permanent: dict
+    features_now: dict
 
     timer_age = None
     time_finish_age: datetime
@@ -619,7 +606,8 @@ class Pet(TemplatePet):
         else:
             self.level = self.level_0
         self.type = random.choice(list(self.level))
-        self.features = self.get_features(*self.level.get(self.type)[1])
+        self.features_permanent = self.get_features(*self.level.get(self.type)[1])
+        self.features_now = self.features_permanent.copy()
 
         self.sex = random.choice(self.sexes)
         self.status = 'пока еще неопознанное яйцо'
@@ -679,8 +667,10 @@ class Pet(TemplatePet):
         elif self.type in self.legendary:
             self.level = self.legendary
 
-        # TODO: DELETE!!!
-        self.features = self.get_features(*self.level.get(self.type)[1])
+        self.features_permanent = self.get_features(*self.level.get(self.type)[1])
+        for key in self.features_permanent.keys():
+            if self.features_now.get(key) is None:
+                self.features_now[key] = self.features_permanent.get(key)
 
         if datetime.utcfromtimestamp(self.time_finish_age.timestamp()) > datetime.utcfromtimestamp(
                 datetime.now(tz=tz).timestamp()):
@@ -913,9 +903,9 @@ class Pet(TemplatePet):
         else:
             self.satiety = 0
 
-        while self.food >= self.features.get('food_per_meal', 2):
+        while self.food >= self.features_now.get('food_per_meal', 2):
             if self.satiety < 100:
-                self.food -= self.features.get('food_per_meal', 2)
+                self.food -= self.features_now.get('food_per_meal', 2)
                 if self.satiety <= 95:
                     self.satiety += 5
                 else:
@@ -930,14 +920,14 @@ class Pet(TemplatePet):
             if self.disease is None:
                 self.fall_ill()
             else:
-                self.lives -= (100 - self.features.get('health', 0)) / 10
+                self.lives -= (100 - self.features_now.get('health', 0)) / 10
 
             if self.lives <= 0:
                 self.leave(False)
                 return
 
         elif self.satiety == 100 and self.lives < 100:
-            self.lives += self.features.get('health', 0) / 10
+            self.lives += self.features_now.get('health', 0) / 10
             if self.lives > 100:
                 self.lives = int(100)
 
@@ -948,9 +938,9 @@ class Pet(TemplatePet):
         self.disease = random.choice(list(self.diseases))
         self.status = f'заболел{"" if self.is_male() else "a"} ({self.disease})'
         for x in self.diseases.get(self.disease).get('effects').items():
-            if self.features.get(x[0]) is None:
-                self.features[x[0]] = self.get_features(*self.level.get(self.type)[1]).get(x[0])
-            self.features[x[0]] -= x[1] if self.features[x[0]] > x[1] else self.features[x[0]]
+            if self.features_now.get(x[0]) is None:  # TODO: Временное
+                self.features_now[x[0]] = self.features_permanent.get(x[0])
+            self.features_now[x[0]] -= x[1] if self.features_now[x[0]] > x[1] else self.features_now[x[0]]
 
     def leave(self, is_elderly):
         self.game_pets.delete_pet(self.owner_id, self)
@@ -980,7 +970,7 @@ class Pet(TemplatePet):
         if self.game_pets.all_pills.get(self.owner_id, 0) >= treatment:
             self.game_pets.all_pills[self.owner_id] -= treatment
             self.disease = None
-            self.features = self.get_features(*self.level.get(self.type)[1])
+            self.features_now = self.features_permanent
             self.lives = 100
             self.status = f'недавно вылечил{"ся" if self.is_male() else "aсь"}'
         else:
@@ -1028,7 +1018,7 @@ class Pet(TemplatePet):
                     f'Еда в кормушке: {round(self.food, 1)}\n\n'
 
                     f'Характеристики:\n'
-                    f'{self.get_string_features(self.features)}')
+                    f'{self.get_string_features(self.features_now)}')
 
     def get_time_to_finish_action(self):
         if self.action is None:
@@ -1179,7 +1169,7 @@ class Pet(TemplatePet):
                     answer_ = f'{self.name} выиграл{"" if self.is_male() else "a"} соревнования по {text_competition} ' \
                               f'и заработал{"" if self.is_male() else "a"} 5💰'
                 else:
-                    if self.features.get('luck', 0) > 0 and random.randint(0, 200) <= self.features.get('luck'):
+                    if self.features_now.get('luck', 0) > 0 and random.randint(0, 100) <= self.features_now.get('luck'):
                         users_info[self.owner_id]["balance"] += 3
                         answer_ = f'{self.name} ничего не выиграл{"" if self.is_male() else "a"} на соревнованиях ' \
                                   f'по {text_competition}, но удача оказалась на {"его" if self.is_male() else "ее"} ' \
@@ -1218,17 +1208,17 @@ class Pet(TemplatePet):
             self.actions()
             return -1
         elif args == 'competition.science':
-            success = self.features.get('intellect', 0)
+            success = self.features_now.get('intellect', 0)
             text_competition = 'науке'
         elif args == 'competition.tug_of_war':
-            success = self.features.get('intellect', 0) * 0.2 + \
-                      self.features.get('power', 0) * 0.8
+            success = self.features_now.get('intellect', 0) * 0.2 + \
+                      self.features_now.get('power', 0) * 0.8
             text_competition = 'перетягиванию каната'
         elif args == 'competition.running':
-            success = self.features.get('speed', 0)
+            success = self.features_now.get('speed', 0)
             text_competition = 'бегу'
         elif args == 'competition.origami':
-            success = self.features.get('neatness', 0)
+            success = self.features_now.get('neatness', 0)
             text_competition = 'оригами'
         else:
             answer = 'Данные соревнования сейчас не проводятся'
@@ -1249,12 +1239,12 @@ class Pet(TemplatePet):
             self.actions()
             return -1
 
-        if (self.features.get('work_time_night') and
+        if (self.features_now.get('work_time_night') and
                 datetime_time(hour=9) <= datetime.now(tz=tz).time() < datetime_time(hour=21)):
             self.action = None
             self.send_message_action(f'{self.name} работает только с 21:00 до 9:00')
             return -1
-        elif (not self.features.get('work_time_night') and
+        elif (not self.features_now.get('work_time_night') and
               (datetime_time(hour=21) <= datetime.now(tz=tz).time() <= datetime_time(hour=23, minute=59, second=59) or
                datetime_time(hour=0) <= datetime.now(tz=tz).time() < datetime_time(hour=9))):
             self.action = None
@@ -1267,7 +1257,7 @@ class Pet(TemplatePet):
                 for work_name in list(all_works.keys()):
                     skills = all_works.get(work_name).get('skills')
                     for skill in list(skills.keys()):
-                        if skills.get(skill) > self.features.get(skill):
+                        if skills.get(skill) > self.features_now.get(skill):
                             break
                     else:
                         buttons += [[get_callback_button(
@@ -1311,7 +1301,7 @@ class Pet(TemplatePet):
                     self.time_start_action = datetime.now(tz=tz)
 
                     now = datetime.now(tz=tz)
-                    if self.features.get('work_time_night'):
+                    if self.features_now.get('work_time_night'):
                         self.time_finish_action = datetime(year=now.year, month=now.month, day=now.day, hour=9,
                                                            tzinfo=tz)
                         if now.time() <= datetime_time(hour=23, minute=59, second=59):
@@ -1408,7 +1398,7 @@ class Minion:
             count = random.randint(30, 50)
             if self.pet.food >= count:
                 self.pet.food -= count
-                self.pet.features['power'] = 100
+                self.pet.features_now['power'] = 100
                 answer += f'сварил{"" if self.pet.is_male() else "a"} зелье силы из {count}🍎 и ' \
                           f'выпил{"" if self.pet.is_male() else "a"} его.' \
                           f'Появились какие-то синие пятна, зато сила увеличилась до 100/100!\n' \
@@ -1458,7 +1448,7 @@ class FloraColossus:
         # 'Молодость': 60 * 60 * 24 * 7, 'Зрелость': 60 * 60 * 24 * 21, 'Старость': 0
         buttons = []
         if self.pet.age >= list(self.pet.ages.keys()).index('Детство'):
-            if self.pet.features.get('health') == self.pet.features.get('power') == 100:
+            if self.pet.features_now.get('health') == self.pet.features_now.get('power') == 100:
                 buttons += [
                     [get_callback_button('Вырастить еду на себе, +20-40🍎', 'primary', {'args': 'to_small_tree'})]]
             else:
@@ -1483,7 +1473,7 @@ class FloraColossus:
             if self.pet.disease is not None:
                 answer = f'{self.pet.name} болеет и не может вырасти'
             else:
-                if self.pet.features.get('health') == self.pet.features.get('power') == 100:
+                if self.pet.features_now.get('health') == self.pet.features_now.get('power') == 100:
                     answer = f'{self.pet.name} уже большой'
                 else:
                     if self.pet.food < 30:
@@ -1492,11 +1482,11 @@ class FloraColossus:
                                  f'Требуется: 30🍎'
                     else:
                         self.pet.food -= 30
-                        self.pet.features['health'] = 100
-                        self.pet.features['power'] = 100
-                        self.pet.features['speed'] = 10
-                        self.pet.features['industriousness'] = 10
-                        self.pet.features['neatness'] = 10
+                        self.pet.features_now['health'] = 100
+                        self.pet.features_now['power'] = 100
+                        self.pet.features_now['speed'] = 10
+                        self.pet.features_now['industriousness'] = 10
+                        self.pet.features_now['neatness'] = 10
                         answer = f'{self.pet.name} стал{"" if self.pet.is_male() else "a"} больше и ' \
                                  f'увеличил{"" if self.pet.is_male() else "a"} показатели здоровья и силы до 100/100, ' \
                                  f'однако скорость, трудолюбие и аккуратность стали всего 10/100\n' \
@@ -1506,12 +1496,12 @@ class FloraColossus:
             if self.pet.disease is not None:
                 answer = f'{self.pet.name} болеет и не может выращивать еду'
             else:
-                if self.pet.features.get('health') < 100 or self.pet.features.get('power') < 100:
+                if self.pet.features_now.get('health') < 100 or self.pet.features_now.get('power') < 100:
                     answer = f'{self.pet.name} мал для выращивания еды'
                 else:
                     food = random.randint(20, 40)
                     self.pet.food += food
-                    self.pet.features = self.pet.get_features(*self.pet.level.get(self.pet.type)[1])
+                    self.pet.features_now = self.pet.get_features(*self.pet.level.get(self.pet.type)[1])
                     answer = f'{self.pet.name} вырастил{"" if self.pet.is_male() else "a"} на себе {food}🍎, ' \
                              f'из-за чего стал{"" if self.pet.is_male() else "a"} меньше и ' \
                              f'вернул{"" if self.pet.is_male() else "a"} все показатели в первоначальное состояние'
@@ -1560,7 +1550,7 @@ class FloraColossus:
             for pet in self.pet.game_pets.all_pets.get(self.pet.owner_id):
                 if pet.action is None:
                     if random.randint(0, 20) != 0:
-                        pet.features['intellect'] = 100
+                        pet.features_now['intellect'] = 100
                     else:
                         someone_fall_ill = True
                         pet.fall_ill()
@@ -1581,7 +1571,7 @@ class FloraColossus:
                 for pet in self.pet.game_pets.all_pets.get(self.pet.owner_id):
                     if pet.action is None:
                         if random.randint(0, 20) != 0:
-                            pet.features['power'] = 80
+                            pet.features_now['power'] = 80
                         else:
                             someone_fall_ill = True
                             pet.fall_ill()
@@ -1593,7 +1583,7 @@ class FloraColossus:
                 for pet in self.pet.game_pets.all_pets.get(self.pet.owner_id):
                     if pet.action is None:
                         if random.randint(0, 20) != 0:
-                            pet.features[feature] = new_value
+                            pet.features_now[feature] = new_value
                         else:
                             someone_fall_ill = True
                             pet.fall_ill()
@@ -1710,7 +1700,7 @@ class Vampire:
                 if pet.name == name:
                     pet.level = pet.level_0
                     pet.type = 'Вампир'
-                    pet.features = pet.get_features(*pet.level.get(pet.type)[1])
+                    pet.features_now = pet.get_features(*pet.level.get(pet.type)[1])
                     pet.status = 'стал вампиром'
                     break
             answer = f'{self.pet.name} обратил питомца {name} в вампира'
