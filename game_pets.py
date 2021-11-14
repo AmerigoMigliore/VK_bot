@@ -24,7 +24,7 @@ class GamePets:
         for pets in self.all_pets.values():
             for pet in pets:
                 pet.stop_me()
-        return self.all_pets, self.all_foods, self.all_pills, self.all_max_pets
+        return self.all_pets, self.all_foods, self.all_pills, self.all_max_pets, self.shelter
 
     def load_me(self, data):
         self.all_pets = data[0]
@@ -32,6 +32,8 @@ class GamePets:
         self.all_pills = data[2]
         if len(data) >= 4:
             self.all_max_pets = data[3]
+        if len(data) >= 5:
+            self.shelter = data[4]
 
         for pets in self.all_pets.values():
             for pet in pets:
