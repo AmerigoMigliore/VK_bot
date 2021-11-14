@@ -668,6 +668,7 @@ class Pet(TemplatePet):
             self.level = self.legendary
 
         self.features_permanent = self.get_features(*self.level.get(self.type)[1])
+        self.features_now = self.features
         for key in self.features_permanent.keys():
             if self.features_now.get(key) is None:
                 self.features_now[key] = self.features_permanent.get(key)
