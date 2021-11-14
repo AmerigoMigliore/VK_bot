@@ -17,7 +17,7 @@ class GamePets:
     start_max_pets = 3
 
     shelter = []
-    shelter_price = 1
+    shelter_price = 20
     market = {}
 
     def save_me(self):
@@ -37,6 +37,9 @@ class GamePets:
             for pet in pets:
                 pet.game_pets = self
                 pet.start_me()
+
+        for pet in self.shelter:
+            pet.game_pets = self
 
     def add_pet(self, owner_id: str):
         self.all_pets[owner_id] += [Pet(self, owner_id)]
@@ -93,8 +96,8 @@ class GamePets:
                 ]
             }, ensure_ascii=False))
         elif args.startswith('shelter.take.yes'):
-            if users_info.get(user_id, {}).get("balance", 0) >= 20:
-                users_info[user_id]["balance"] -= 20
+            if users_info.get(user_id, {}).get("balance", 0) >= self.shelter_price:
+                users_info[user_id]["balance"] -= self.shelter_price
 
                 name = args.replace('shelter.take.yes.', '')
                 for pet in self.shelter:
@@ -112,7 +115,7 @@ class GamePets:
             else:
                 answer = f'Недостаточно 💰 для покупки.\n' \
                          f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n' \
-                         f'Требуется: 20💰'
+                         f'Требуется: {self.shelter_price}💰'
 
             vk_session.method('messages.send',
                               {'user_id': int(user_id),
@@ -191,7 +194,7 @@ class GamePets:
             keyboard = str(json.dumps({
                 "one_time": False,
                 "buttons": [
-                    [get_callback_button('Забрать, -20💰', 'primary', {'args': 'shelter.take'}),
+                    [get_callback_button(f'Забрать ({self.shelter_price}💰)', 'primary', {'args': 'shelter.take'}),
                      get_callback_button('Отдать', 'secondary', {'args': 'shelter.give'})],
                     [get_callback_button('Назад', 'negative', {'args': 'shelter.back'})]
                 ]
@@ -248,12 +251,6 @@ class GamePets:
                                        'message': 'Твои питомцы будут ждать тебя, хозяин!',
                                        'random_id': 0, 'keyboard': main_keyboard})
                     change_users_info(user_id, 'autoresponder')
-
-                    # Сброс активированной кнопки, вызвавшей событие
-                    vk_session.method('messages.sendMessageEventAnswer',
-                                      {'event_id': event.obj.event_id,
-                                       'user_id': int(user_id),
-                                       'peer_id': event.obj.peer_id})
                     return
             elif method == 'store':
                 self.store(user_id, event)
@@ -264,12 +261,6 @@ class GamePets:
                         break
                 else:
                     self.start(user_id)
-
-            # Сброс активированной кнопки, вызвавшей событие
-            vk_session.method('messages.sendMessageEventAnswer',
-                              {'event_id': event.obj.event_id,
-                               'user_id': int(user_id),
-                               'peer_id': event.obj.peer_id})
 
         elif event.type == VkBotEventType.MESSAGE_NEW:
             user_id = str(event.obj.from_id)
@@ -486,8 +477,8 @@ class TemplatePet:
 
         # food_per_meal=0, health=0, intellect=0, power=0, speed=0, industriousness=0, neatness=0, luck=0, work_time_night=False
         self.level_0 = {'Миньон': [Minion, (2, 30, 10, 30, 40, 80, 20, 0, False)],
-                        'Грут': [FloraColossus, (2, 30, 80, 30, 80, 30, 30, 0, False)],
-                        'Вампир': [Vampire, (2, 50, 20, 30, 60, 30, 30, 0, True)]
+                        'Грут': [FloraColossus, (2, 30, 80, 30, 60, 30, 30, 0, False)],
+                        'Вампир': [Vampire, (2, 50, 20, 30, 100, 30, 30, 0, True)]
                         # 'Ведьма': [Witch, (1.5, 30, 80, 30, 80, 30, 30, 0, False)],  # TODO: Проработать характеристики
                         # 'Дракон': [Dragon, (1.5, 30, 80, 30, 80, 30, 30, 0, False)],  # TODO: Проработать характеристики
                         # 'Пират': [Pirate, (1.5, 30, 80, 30, 80, 30, 30, 0, False)]  # TODO: Проработать характеристики
@@ -512,7 +503,7 @@ class TemplatePet:
             'Вывих ноги': {'treatment': 4, 'effects': self.get_features(health=5, power=100, speed=100)},
             'Грипп': {'treatment': 3, 'effects': self.get_features(health=10, speed=10, industriousness=10)}
         }  # TODO: Заполнить!
-        self.works = {'Наладчик бота': {'skills': {'intellect': 60, 'industriousness': 30, 'neatness': 30},
+        self.works = {'Отладчик бота': {'skills': {'intellect': 60, 'industriousness': 30, 'neatness': 30},
                                         'salary_per_min': 0.2, 'salary_in': 'money'},
                       'Переворачиватель пингвинов': {'skills': {'power': 30, 'industriousness': 50},
                                                      'salary_per_min': 0.1, 'salary_in': 'money'}}  # TODO: Заполнить!
@@ -675,8 +666,20 @@ class Pet(TemplatePet):
 
     def start_me(self):
         super().__init__()
-        if self.type == 'Флора колосс':
-            self.type = 'Грут'
+        if self.type in self.level_0:
+            self.level = self.level_0
+        elif self.type in self.level_1:
+            self.level = self.level_1
+        elif self.type in self.level_2:
+            self.level = self.level_2
+        elif self.type in self.level_3:
+            self.level = self.level_3
+        elif self.type in self.legendary:
+            self.level = self.legendary
+
+        # TODO: DELETE!!!
+        self.features = self.get_features(*self.level.get(self.type)[1])
+
         if datetime.utcfromtimestamp(self.time_finish_age.timestamp()) > datetime.utcfromtimestamp(
                 datetime.now(tz=tz).timestamp()):
             self.timer_age = threading.Timer((datetime.utcfromtimestamp(
@@ -1554,7 +1557,7 @@ class FloraColossus:
                          f'не хватило 🍎, поэтому ничего не получилось.\n' \
                          f'Кстати, еды в кормушке теперь тоже нет'
         elif action == 1:
-            pills = random.randint(0, 2)
+            pills = random.randint(0, 3)
             if pills > 0:
                 self.pet.game_pets.all_pills[self.pet.owner_id] += pills
                 answer += f'изучил{"" if self.pet.is_male() else "a"} книгу по медицине и ' \
@@ -1567,42 +1570,52 @@ class FloraColossus:
                           f'отравил{"ся" if self.pet.is_male() else "ась"}.\n' \
                           f'Лекарства были признаны непригодными, а питомца надо вылечить!'
         elif action == 2:
+            someone_fall_ill = False
             for pet in self.pet.game_pets.all_pets.get(self.pet.owner_id):
                 if pet.action is None:
-                    if bool(random.randint(0, 1)):
+                    if random.randint(0, 20) != 0:
                         pet.features['intellect'] = 100
                     else:
+                        someone_fall_ill = True
                         pet.fall_ill()
-            answer += f'прочитал{"" if self.pet.is_male() else "a"} всем незанятым питомцам лекцию по квантовой физике. ' \
-                      f'Кто-то что-то понял и повысил показатели интеллекта до 100/100, а кто-то сошел с ума, заболел ' \
-                      f'и требует Вашего внимания.\n' \
-                      f'{self.pet.name} сказал{"" if self.pet.is_male() else "a"}, что ' \
-                      f'он{"" if self.pet.is_male() else "a"} тут не при чем, это просто неокрепший мозг!'
+            answer += f'прочитал{"" if self.pet.is_male() else "a"} всем незанятым питомцам лекцию по квантовой физике.\n'
+            if someone_fall_ill:
+                answer += f'Кто-то что-то понял и повысил показатели интеллекта до 100/100, а кто-то сошел с ума, заболел ' \
+                          f'и требует Вашего внимания. ' \
+                          f'{self.pet.name} сказал{"" if self.pet.is_male() else "a"}, что ' \
+                          f'он{"" if self.pet.is_male() else "a"} тут не при чем, это просто неокрепший мозг!'
+            else:
+                answer += f'На удивление, все питомцы поняли данный материал и теперь мучают соседей опытами с ' \
+                          f'телепортацией информации.'
         elif action == 3:
+            someone_fall_ill = False
             answer += f'подсмотрел{"" if self.pet.is_male() else "a"} у Вашего Миньона рецепт зелья силы и ' \
                       f'усовершенствовал{"" if self.pet.is_male() else "a"} его: приготовленное зелье не затратило 🍎.\n'
             if bool(random.randint(0, 1)):
                 for pet in self.pet.game_pets.all_pets.get(self.pet.owner_id):
                     if pet.action is None:
-                        if bool(random.randint(0, 1)):
-                            pet.features['power'] = 50
+                        if random.randint(0, 20) != 0:
+                            pet.features['power'] = 80
                         else:
+                            someone_fall_ill = True
                             pet.fall_ill()
-                answer += 'Однако получился странный эффект: оно не увеличивает силу, а устанавливает ее ровно на ' \
-                          '50/100.\n'
+                answer += 'Однако получился странный эффект: оно не увеличивает силу до максимума, а устанавливает ее ' \
+                          'ровно на 80/100.\n'
             else:
                 feature = random.choice(['health', 'intellect', 'speed', 'industriousness', 'neatness'])
-                new_value = random.randint(20, 80)
+                new_value = random.randint(30, 90)
                 for pet in self.pet.game_pets.all_pets.get(self.pet.owner_id):
                     if pet.action is None:
-                        if bool(random.randint(0, 1)):
+                        if random.randint(0, 20) != 0:
                             pet.features[feature] = new_value
                         else:
+                            someone_fall_ill = True
                             pet.fall_ill()
                 answer += f'К сожалению, что-то пошло не так, и вместо силы зелье меняет параметр ' \
                           f'{self.pet.translate(feature)} до {new_value}/100.\n'
-            answer += 'Тем не менее, все незанятые питомцы получили свою дозу! ' \
-                      'Кому-то, правда, зелье не пошло и появились признаки болезни...'
+            answer += 'Тем не менее, все незанятые питомцы получили свою дозу!'
+            if someone_fall_ill:
+                answer += ' Кому-то, правда, зелье не пошло и появились признаки болезни...'
         elif action == 4:
             money = random.randint(1, 15)
             users_info[self.pet.owner_id]["balance"] += money
@@ -1612,7 +1625,7 @@ class FloraColossus:
                       f'заработал{"" if self.pet.is_male() else "a"} {money * 10}💰, ' \
                       f'большая часть которых ушла на оплату проезда и вступительного взноса.' \
                       f'Заработано: {money}💰'
-            if bool(random.randint(0, 1)):
+            if random.randint(0, 20) == 0:
                 self.pet.fall_ill()
                 answer += f'\n\nК сожалению, в стране проведения олимпиады сейчас пандемия нового грутовируса, поэтому ' \
                           f'{self.pet.name} заболел{"" if self.pet.is_male() else "a"}'

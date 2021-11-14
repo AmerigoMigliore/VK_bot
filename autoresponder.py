@@ -87,12 +87,6 @@ class Autoresponder:
             elif method == 'game_start':
                 self.game_start(args, user_id)
 
-            # Сброс активированной кнопки, вызвавшей событие
-            vk_session.method('messages.sendMessageEventAnswer',
-                              {'event_id': event.obj.event_id,
-                               'user_id': int(user_id),
-                               'peer_id': event.obj.peer_id})
-
         elif event.type == VkBotEventType.MESSAGE_NEW:
             user_id = str(event.obj.from_id)
             message = event.obj.text
@@ -957,7 +951,7 @@ class Autoresponder:
 
     @staticmethod
     def get_balance(arg, user_id):
-        return f'Ваш баланс: {users_info[user_id]["balance"]}💰'
+        return f'Ваш баланс: {round(users_info[user_id]["balance"], 1)}💰'
 
     def give_money(self, arg, admin_id):
         admin_id = str(admin_id)
@@ -980,10 +974,10 @@ class Autoresponder:
                               {'user_id': int(split[0]),
                                'message': f'Вам начислено "{split[1]}"💰 пользователем "{name}" '
                                           f'уровня "{users_info.get(admin_id).get("role")}"\n'
-                                          f'Баланс: {users_info[str(split[0])]["balance"]}💰',
+                                          f'Баланс: {round(users_info[str(split[0])]["balance"], 1)}💰',
                                'random_id': 0})
             return f'Пользователю "{split[0]}" начислено {split[1]}💰.\n' \
-                   f'Баланс: {users_info[str(split[0])]["balance"]}💰'
+                   f'Баланс: {round(users_info[str(split[0])]["balance"], 1)}💰'
 
     @staticmethod
     def game_start(arg, user_id, message=None):

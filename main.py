@@ -145,13 +145,29 @@ def async_longpoll_listen(event):
             # Обработка событий
             if event.type == VkBotEventType.MESSAGE_EVENT:
                 user_id = str(event.obj.user_id)
-
-                users_info[user_id]['lock'].acquire()
                 try:
-                    all_classes.get(users_info.get(user_id, {}).get('class', 'autoresponder')) \
-                        .process_event(event=event)
+                    # Если сообщение не от администратора, проверить бота на включенность. Иначе выдать сообщение
+                    if roles[users_info.get(user_id, {}).get('role', 'user')] < roles['admin'] and not is_bot_active:
+                        vk_session.method('messages.send',
+                                          {'user_id': int(user_id),
+                                           'message': "Меня тут пока что улучшают, и я не могу отвечать."
+                                                      "\nПопробуй написать мне немного позднее", 'random_id': 0})
+                        vk_session.method('messages.send',
+                                          {'user_id': int(user_id), 'random_id': 0, 'sticker_id': 18493})  # 58715
+                        return
+
+                    users_info[user_id]['lock'].acquire()
+                    try:
+                        all_classes.get(users_info.get(user_id, {}).get('class', 'autoresponder')) \
+                            .process_event(event=event)
+                    finally:
+                        users_info[user_id]['lock'].release()
                 finally:
-                    users_info[user_id]['lock'].release()
+                    # Сброс активированной кнопки, вызвавшей событие
+                    vk_session.method('messages.sendMessageEventAnswer',
+                                      {'event_id': event.obj.event_id,
+                                       'user_id': int(user_id),
+                                       'peer_id': event.obj.peer_id})
 
             # TODO: ТЕСТИРОВАТЬ!!!
             if event.type == VkBotEventType.VKPAY_TRANSACTION:

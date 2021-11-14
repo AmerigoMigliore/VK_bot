@@ -43,12 +43,6 @@ class GameLuck:
                                        'message': 'Сегодня твой удачный день! Приходи еще!',
                                        'random_id': 0, 'keyboard': main_keyboard})
                     change_users_info(user_id, 'autoresponder')
-
-                    # Сброс активированной кнопки, вызвавшей событие
-                    vk_session.method('messages.sendMessageEventAnswer',
-                                      {'event_id': event.obj.event_id,
-                                       'user_id': int(user_id),
-                                       'peer_id': event.obj.peer_id})
                     return
                 else:
                     self.start(user_id, args)
@@ -58,12 +52,6 @@ class GameLuck:
 
             elif method == 'three_out_of_nine':
                 self.three_out_of_nine(user_id, args)
-
-            # Сброс активированной кнопки, вызвавшей событие
-            vk_session.method('messages.sendMessageEventAnswer',
-                              {'event_id': event.obj.event_id,
-                               'user_id': int(user_id),
-                               'peer_id': event.obj.peer_id})
 
         elif event.type == VkBotEventType.MESSAGE_NEW:
             user_id = str(event.obj.from_id)

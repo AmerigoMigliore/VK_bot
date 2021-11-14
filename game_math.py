@@ -189,12 +189,6 @@ class GameMath:
                 args = event.obj.payload.get('args')
                 self.store(user_id, args)
 
-            # Сброс активированной кнопки, вызвавшей событие
-            vk_session.method('messages.sendMessageEventAnswer',
-                              {'event_id': event.obj.event_id,
-                               'user_id': int(user_id),
-                               'peer_id': event.obj.peer_id})
-
         elif event.type == VkBotEventType.MESSAGE_NEW:
             user_id = str(event.obj.from_id)
             message = event.obj.text.lower()
@@ -333,7 +327,7 @@ class GameMath:
             vk_session.method('messages.send',
                               {'user_id': int(user_id),
                                'message': f'Ваш ответ "{answer}" верный!\n'
-                                          f'Всего правильных ответов: "{game_math_stats.get(user_id).get("score")}"!',
+                                          f'Всего правильных ответов: {game_math_stats.get(user_id).get("score")}!',
                                'random_id': 0})
             self.game(user_id, "")
 
@@ -342,7 +336,7 @@ class GameMath:
             vk_session.method('messages.send',
                               {'user_id': int(user_id),
                                'message': f'Ваш ответ "{answer}" неверный!\n'
-                                          f'Верный ответ: "{game_math_stats.get(user_id).get("answer")}"!',
+                                          f'Верный ответ: {game_math_stats.get(user_id).get("answer")}!',
                                'random_id': 0})
             self.end(user_id)
 
@@ -430,7 +424,7 @@ class GameMath:
             num = 0
             for gamer in top_sort:
                 num += 1
-                string_top += "{}. {}:\n Верных ответов: {}\n\n".format(num, gamer[0], gamer[1])
+                string_top += f"{num}. {gamer[0]}:\n Верных ответов: {gamer[1]}\n\n"
 
             # Минутка хвастовства
             if top_sort[0][0] == "Александр Березин":
