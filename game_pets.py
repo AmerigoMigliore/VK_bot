@@ -24,7 +24,7 @@ class GamePets:
         for pets in self.all_pets.values():
             for pet in pets:
                 pet.stop_me()
-        return self.all_pets, self.all_foods, self.all_pills, self.all_max_pets, self.shelter
+        return self.all_pets, self.all_foods, self.all_pills, self.all_max_pets
 
     def load_me(self, data):
         self.all_pets = data[0]
@@ -1251,6 +1251,10 @@ class Pet(TemplatePet):
             self.send_message_action(f'{self.name} работает только с 9:00 до 21:00')
             return -1
         else:
+            if self.disease is not None:
+                self.send_message_action(f'{self.name} болеет ({self.disease}) и не может пойти на работу')
+                return -1
+
             all_works = {**self.works, **self.identified_pet.works}
             if args == 'work':
                 buttons = []
@@ -1284,17 +1288,22 @@ class Pet(TemplatePet):
                 if args == 'work.finish':
                     self.action = None
                     self.timer_action.cancel()
-                    salary = round(floor((datetime.now(tz=tz) - self.time_start_action).seconds / 60) *
-                                   all_works.get(self.work_name).get('salary_per_min'), 1)
+                    work_time = round(floor((datetime.now(tz=tz) - self.time_start_action).seconds / 60), 1)
+                    salary = work_time * all_works.get(self.work_name).get('salary_per_min')
 
                     answer = f'{self.name} вернул{"ся" if self.is_male() else "aсь"} с работы\n' \
                              f'Заработано: {salary}'
+
                     if all_works.get(self.work_name).get('salary_in') == 'money':
                         users_info[self.owner_id]["balance"] += salary
                         answer += '💰'
                     else:
                         self.food += salary
                         answer += '🍎'
+
+                    if work_time >= 180 and random.randint(0, 10) == 0:
+                        self.fall_ill()
+                        answer += f'\nНа работе произошел несчастный случай, из-за чего {self.name} заболел.'
                 else:
                     self.work_name = args.replace('work.', '')
                     self.action = f'работает ({self.work_name})'
