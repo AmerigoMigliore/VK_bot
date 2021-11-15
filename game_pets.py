@@ -596,7 +596,7 @@ class Pet(TemplatePet):
     time_finish_action: datetime
 
     bones = 0
-    max_bones = 5
+    max_bones = 10
     food_from_bone = 1 / 5
 
     is_body_studied = False
