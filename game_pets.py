@@ -1420,6 +1420,14 @@ class Pet(TemplatePet):
             if self.game_pets.all_potions.get(self.owner_id, 0) >= 2:
                 self.game_pets.all_potions[self.owner_id] -= 2
                 self.age = list(self.ages.keys()).index('Детство')
+                self.status = f'омолодил{"ся" if self.is_male() else "aсь"}'
+
+                self.timer_age.cancel()
+                self.timer_age = threading.Timer(self.ages[list(self.ages.keys())[self.age]], self.next_age)
+                self.timer_age.start()
+                self.time_finish_age = datetime.now(tz=tz) + timedelta(
+                    seconds=self.ages[list(self.ages.keys())[self.age]])
+
                 answer = f'{self.name} выпил{"" if self.is_male() else "a"} эликсир и ' \
                          f'стал{"" if self.is_male() else "a"} молод{"ым" if self.is_male() else "ой"}!'
                 vk_session.method('messages.send',
@@ -1925,7 +1933,8 @@ class Witch:
                                                  {'args': 'study_magic'})]]
         if self.pet.age >= list(self.pet.ages.keys()).index('Юность'):
             if self.know_magic:
-                buttons += [[get_callback_button('Сварить быстрое зелье (200🍎) [1🧪]', 'primary', {'args': 'create_potion.fast'})]]
+                buttons += [[get_callback_button('Сварить быстрое зелье (200🍎) [1🧪]', 'primary',
+                                                 {'args': 'create_potion.fast'})]]
                 buttons += [[get_callback_button('Сварить дешевое зелье (50🍎, 5ч) [1🧪]', 'primary',
                                                  {'args': 'create_potion.cheap'})]]
 
