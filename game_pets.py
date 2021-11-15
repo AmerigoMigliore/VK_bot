@@ -1908,10 +1908,10 @@ class Witch:
     def __init__(self, pet: Pet):
         self.pet = pet
         self.works = {'Фармацевт': {'skills': {'health': 40, 'intellect': 40, 'neatness': 40},
-                                    'salary_per_min': 2, 'salary_in': 'food'},
+                                    'salary_per_min': 1, 'salary_in': 'food'},
                       f'Водитель аэротакси': {
                           'skills': {'intellect': 40, 'industriousness': 30, 'neatness': 30},
-                          'salary_per_min': 2, 'salary_in': 'food'}}
+                          'salary_per_min': 1, 'salary_in': 'food'}}
 
     def get_action_buttons(self):
         # 'Яйцо': 60 * 10, 'Младенчество': 60 * 20, 'Детство': 60 * 60 * 24, 'Юность': 60 * 60 * 24 * 2,
