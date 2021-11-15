@@ -400,8 +400,8 @@ class GamePets:
                     if users_info.get(user_id, {}).get("balance", 0) >= prices.get("pet"):
                         users_info[user_id]["balance"] -= prices.get("pet")
                         self.add_pet(user_id)
-                        answer = f'Вы приобрели нового питомца. Он доступен в главном меню' \
-                                 f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n'
+                        answer = f'Вы приобрели нового питомца. Он доступен в главном меню\n' \
+                                 f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰'
                     else:
                         answer = f'Недостаточно 💰 для покупки.\n' \
                                  f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n' \
@@ -452,7 +452,8 @@ class GamePets:
                 if users_info.get(user_id, {}).get("balance", 0) >= prices.get(args):
                     users_info[user_id]["balance"] -= prices.get(args)
                     self.all_max_pets[user_id] += 1
-                    answer = f'Вы приобрели 1🧺.\nВсего доступно: {self.all_max_pets[user_id]}🧺'
+                    answer = f'Вы приобрели 1🧺.\n' \
+                             f'Всего доступно: {self.all_max_pets[user_id]}🧺'
                 else:
                     answer = f'Недостаточно 💰 для покупки.\n' \
                              f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n' \
@@ -1780,7 +1781,7 @@ class Vampire:
         buttons = []
         if self.pet.age >= list(self.pet.ages.keys()).index('Детство'):
             if self.pet.disease is not None or self.pet.lives < 100:
-                buttons += [[get_callback_button('Использовать регенерацию', 'primary', {'args': 'use_regeneration'})]]
+                buttons += [[get_callback_button('Использовать регенерацию (5мин)', 'primary', {'args': 'use_regeneration'})]]
             buttons += [[get_callback_button('Съесть чеснок', 'primary', {'args': 'eat_garlic'})]]
         if self.pet.age >= list(self.pet.ages.keys()).index('Юность'):
             buttons += [[get_callback_button('Обратить питомца в вампира', 'primary', {'args': 'turn_into_vampire'})]]
@@ -1813,7 +1814,11 @@ class Vampire:
         if is_finally:
             self.pet.disease = None
             self.pet.lives = 100
-            answer = f'{self.pet.name} избавился от болезней и полностью восстановил жизни'
+            answer = f'{self.pet.name} избавил{"ся" if self.pet.is_male() else "aсь"} от болезней и полностью ' \
+                     f'восстановил{"" if self.pet.is_male() else "a"} жизни'
+            self.pet.action = None
+            self.pet.send_message_action(answer)
+            return -1
         else:
             self.pet.action = 'использует навык регенерации'
             self.pet.timer_action = threading.Timer(60 * 5, function=self.use_regeneration, args=[True])
@@ -1824,7 +1829,8 @@ class Vampire:
 
     def eat_garlic(self):
         self.pet.fall_ill()
-        answer = f'{self.pet.name} отравился и заболел. А Вы чего хотели?'
+        answer = f'{self.pet.name} отравил{"ся" if self.pet.is_male() else "aсь"} и ' \
+                 f'заболел{"" if self.pet.is_male() else "a"}. А Вы чего хотели?'
         return answer
 
     def turn_into_vampire(self, args=None):
@@ -1855,7 +1861,7 @@ class Vampire:
                     pet.features_now = pet.get_features(*pet.level.get(pet.type)[1])
                     pet.status = 'стал вампиром'
                     break
-            answer = f'{self.pet.name} обратил питомца {name} в вампира'
+            answer = f'{self.pet.name} обратил{"" if self.pet.is_male() else "a"} питомца {name} в вампира'
 
             vk_session.method('messages.send',
                               {'user_id': int(self.pet.owner_id),
@@ -1891,11 +1897,12 @@ class Vampire:
         answer = 'Вампира отправить загорать на солнце? Ну Вы... Ващеее...\n'
         leave = False
         if random.randint(0, 50) == 0:
-            answer += 'Он потерял все жизни!'
+            answer += f'Он{"" if self.pet.is_male() else "a"} потерял{"" if self.pet.is_male() else "a"} все жизни!'
             leave = True
         else:
             self.pet.fall_ill()
-            answer += 'Он заболел! И хорошо, что только заболел.'
+            answer += f'Он{"" if self.pet.is_male() else "a"} заболел{"" if self.pet.is_male() else "a"}! ' \
+                      f'И хорошо, что только заболел{"" if self.pet.is_male() else "a"}...'
 
         vk_session.method('messages.send',
                           {'user_id': int(self.pet.owner_id),
