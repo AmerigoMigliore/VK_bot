@@ -89,7 +89,7 @@ class Autoresponder:
 
         elif event.type == VkBotEventType.MESSAGE_NEW:
             user_id = str(event.obj.from_id)
-            message = event.obj.text
+            message = event.obj.text.strip()
 
             # Проверка пользователя на наличие его ID в словаре.
             # Если пользователя нет, добавить его и дать базовый набор запросов и ответов

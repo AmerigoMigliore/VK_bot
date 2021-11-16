@@ -20,12 +20,14 @@ class GamePets:
     shelter = []
     shelter_price = 20
     market = {}
+    max_lot = 0
 
     def save_me(self):
         for pets in self.all_pets.values():
             for pet in pets:
                 pet.stop_me()
-        return self.all_pets, self.all_foods, self.all_pills, self.all_max_pets, self.shelter, self.all_potions
+        return (self.all_pets, self.all_foods, self.all_pills, self.all_max_pets, self.shelter, self.all_potions,
+                self.market, self.max_lot)
 
     def load_me(self, data):
         self.all_pets = data[0]
@@ -37,6 +39,10 @@ class GamePets:
             self.shelter = data[4]
         if len(data) >= 6:
             self.all_potions = data[5]
+        if len(data) >= 7:
+            self.market = data[6]
+        if len(data) >= 8:
+            self.max_lot = data[7]
 
         for pets in self.all_pets.values():
             for pet in pets:
@@ -52,7 +58,8 @@ class GamePets:
     def delete_pet(self, owner_id: str, pet):
         self.all_pets[owner_id].remove(pet)
 
-    def send_pets_page(self, user_id, page, pets_list, prefix):
+    @staticmethod
+    def send_pets_page(user_id, page, pets_list, prefix):
         buttons = []
         pets_in_page = 5
         first = page * pets_in_page
@@ -65,7 +72,7 @@ class GamePets:
         if page > 0:
             menu += [get_callback_button('⬅', 'positive', {'args': f'{prefix}.page.{page - 1}'})]
         menu += [get_callback_button('Назад', 'negative', {'args': f'{prefix}.back'})]
-        if last < len(self.all_pets.get(user_id, [])):
+        if last < len(pets_list):
             menu += [get_callback_button('➡', 'positive', {'args': f'{prefix}.page.{page + 1}'})]
 
         keyboard = str(json.dumps({
@@ -153,7 +160,9 @@ class GamePets:
 
         # Отдать питомца
         elif args == 'shelter.give':
-            self.send_pets_page(user_id, 0, self.all_pets.get(user_id, []), 'shelter.give')
+            pets = [user_pet for user_pet in self.all_pets.get(user_id, [])
+                    if user_pet not in [market_pet.get('pet') for market_pet in self.market.values()]]
+            self.send_pets_page(user_id, 0, pets, 'shelter.give')
             return
         elif args.startswith('shelter.give.Pet'):
             name = args.replace('shelter.give.Pet.', '')
@@ -194,15 +203,20 @@ class GamePets:
             self.shelter_actions(user_id)
             return
         elif args == 'shelter.give.no':
-            self.send_pets_page(user_id, 0, self.all_pets.get(user_id, []), 'shelter.give')
+            pets = [user_pet for user_pet in self.all_pets.get(user_id, [])
+                    if user_pet not in [market_pet.get('pet') for market_pet in self.market.values()]]
+            self.send_pets_page(user_id, 0, pets, 'shelter.give')
             return
         elif args.startswith('shelter.give.page.'):
-            self.send_pets_page(user_id, int(args.replace('shelter.give.page.', '')), self.all_pets.get(user_id, []),
+            pets = [user_pet for user_pet in self.all_pets.get(user_id, [])
+                    if user_pet not in [market_pet.get('pet') for market_pet in self.market.values()]]
+            self.send_pets_page(user_id, int(args.replace('shelter.give.page.', '')), pets,
                                 'shelter.give')
             return
         elif args == 'shelter.give.back':
             self.shelter_actions(user_id)
             return
+
         elif args == 'shelter.back':
             self.start(user_id)
             return
@@ -215,6 +229,208 @@ class GamePets:
                     [get_callback_button(f'Забрать ({self.shelter_price}💰)', 'primary', {'args': 'shelter.take'}),
                      get_callback_button('Отдать', 'secondary', {'args': 'shelter.give'})],
                     [get_callback_button('Назад', 'negative', {'args': 'shelter.back'})]
+                ]
+            }, ensure_ascii=False))
+
+        vk_session.method('messages.send',
+                          {'user_id': int(user_id),
+                           'message': answer,
+                           'random_id': 0, 'keyboard': keyboard})
+
+    def market_actions(self, user_id, args=None, event=None):
+        keyboard = None
+        if args is None:
+            args = ''
+
+        message = ''
+        if event is not None:
+            args = 'market.price'
+            message = event.obj.text.strip()
+
+        # Купить питомца
+        if args == 'market.take':
+            self.send_pets_page(user_id, 0, list(self.market.keys()), 'market.take')
+            return
+        elif args.startswith('market.take.Pet'):
+            lot_name = args.replace('market.take.Pet.', '')
+            for lot in self.market.keys():
+                if lot.name == lot_name:
+                    pet = self.market.get(lot).get("pet")
+                    owner_id = self.market.get(lot).get("owner_id")
+                    if pet in self.all_pets.get(owner_id):
+                        price = self.market.get(lot).get("price")
+                        answer = f'Вот информация о лоте {lot_name.replace("Лот", "")}. Желаете приобрести его?\n\n' \
+                                 f'Стоимость: {price}💰\n\n' \
+                                 f'{pet.get_info(True)}'
+
+                        keyboard = str(json.dumps({
+                            "one_time": False,
+                            "buttons": [
+                                [get_callback_button(f'Да ({price}💰)', 'positive',
+                                                     {'args': f'market.take.yes.{lot_name}'}),
+                                 get_callback_button('Нет', 'negative', {'args': f'market.take.no'})]
+                            ]
+                        }, ensure_ascii=False))
+                        break
+                    else:
+                        answer = f'{lot_name} не найден на рынке. Возможно, кто-то уже купил его или питомец был ' \
+                                 f'переведен в другой домик. Такое иногда случается'
+                        vk_session.method('messages.send', {'user_id': int(user_id), 'message': answer, 'random_id': 0})
+                        self.market.pop(lot)
+                        self.market_actions(user_id, 'market.take')
+                        return
+            else:
+                answer = f'{lot_name} не найден на рынке. Возможно, кто-то уже купил его или питомец был ' \
+                         f'переведен в другой домик. Такое иногда случается'
+        elif args.startswith('market.take.yes'):
+            lot_name = args.replace('market.take.yes.', '')
+            for lot in self.market.keys():
+                if lot.name == lot_name:
+                    price = self.market.get(lot).get("price")
+                    pet = self.market.get(lot).get("pet")
+                    owner_id = self.market.get(lot).get("owner_id")
+                    if pet in self.all_pets.get(owner_id):
+                        if users_info.get(user_id, {}).get("balance", 0) >= price:
+                            pet.stop_me()
+
+                            users_info[user_id]["balance"] -= price
+                            users_info[owner_id]["balance"] += price
+
+                            self.all_pets[owner_id].remove(pet)
+                            self.market.pop(lot)
+
+                            new_name = pet.name
+                            n = 1
+                            while True:
+                                for x in self.all_pets.get(user_id):
+                                    if new_name == x.name:
+                                        new_name = f'{pet.name} {n}'
+                                        n += 1
+                                        break
+                                else:
+                                    break
+                            pet.name = new_name
+
+                            self.all_pets[user_id] += [pet]
+
+                            pet.status = 'обрел нового хозяина!'
+                            pet.owner_id = user_id
+
+                            pet.start_me()
+                            answer = f'Вы купили {pet.name}. Он уже в Вашем домике!'
+                        else:
+                            answer = f'Недостаточно 💰 для покупки.\n' \
+                                     f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n' \
+                                     f'Требуется: {price}💰'
+                    else:
+                        answer = f'{lot_name} не найден на рынке. Возможно, кто-то уже купил его или питомец был ' \
+                                 f'переведен в другой домик. Такое иногда случается'
+                        self.market.pop(lot)
+
+                    vk_session.method('messages.send', {'user_id': int(user_id), 'message': answer, 'random_id': 0})
+                    self.market_actions(user_id, 'market.take')
+                    return
+            else:
+                answer = f'{lot_name} не найден на рынке. Возможно, кто-то уже купил его или питомец был ' \
+                         f'переведен в другой домик. Такое иногда случается'
+        elif args == 'market.take.no':
+            self.send_pets_page(user_id, 0, list(self.market.keys()), 'market.take')
+            return
+        elif args.startswith('market.take.page.'):
+            self.send_pets_page(user_id, int(args.replace('market.take.page.', '')), list(self.market.keys()),
+                                'market.take')
+            return
+        elif args == 'market.take.back':
+            self.market_actions(user_id)
+            return
+
+        # Продать питомца
+        elif args == 'market.give':
+            pets = [user_pet for user_pet in self.all_pets.get(user_id, [])
+                    if user_pet not in [market_pet.get('pet') for market_pet in self.market.values()]]
+            self.send_pets_page(user_id, 0, pets, 'market.give')
+            return
+        elif args.startswith('market.give.Pet'):
+            name = args.replace('market.give.Pet.', '')
+            change_users_info(user_id, new_method='market', new_args={'name': name})
+            answer = 'Укажите желаемую стоимость питомца (в 💰)\n' \
+                     'На следующем этапе Вы сможете подтвердить или отменить свой выбор'
+            keyboard = str(json.dumps({
+                "one_time": False,
+                "buttons": [
+                    [get_callback_button('Назад', 'negative', {'args': f'market.give'})]
+                ]
+            }, ensure_ascii=False))
+        elif args == 'market.price':
+            if is_float(message):
+                price = round(float(message), 2)
+                name = users_info.get(user_id, {}).get("args", {}).get("name")
+                change_users_info(user_id, new_method='start')
+                answer = f'Уверены, что хотите продать {name} за {price}💰?\n' \
+                         f'Отменить выставленный лот будет НЕВОЗМОЖНО!'
+                keyboard = str(json.dumps({
+                    "one_time": False,
+                    "buttons": [
+                        [get_callback_button('Да', 'positive', {'args': f'market.give.yes.{name}.{price}'}),
+                         get_callback_button('Нет', 'negative', {'args': f'market.give.no'})]
+                    ]
+                }, ensure_ascii=False))
+            else:
+                answer = 'Неверная стоимость. Допустимый формат: вещественное число\n' \
+                         'Укажите желаемую стоимость питомца (в 💰)'
+                keyboard = None
+        elif args.startswith('market.give.yes'):
+            name_price = args.replace('market.give.yes.', '')
+            name = name_price[:name_price.find('.')]
+            price = round(float(name_price[name_price.find('.') + 1:]), 2)
+            for pet in self.all_pets[user_id]:
+                if pet.name == name:
+                    class Lot:
+                        def __init__(self, string):
+                            self.name = string
+
+                    lot = Lot(f'Лот {self.max_lot}')
+                    self.max_lot += 1
+
+                    self.market[lot] = {'pet': pet, 'owner_id': user_id, 'price': price}
+                    answer = f'Вы выставили {name} на продажу. Ему присвоен {lot.name}\n' \
+                             f'Питомец все еще находится у Вас. Как только на заявку кто-то откликнется, он самостоятельно ' \
+                             f'завершит все текущие действия и перейдет к новому хозяину, а его стоимость поступит на Ваш счет.'
+                    break
+            else:
+                answer = 'Питомец не найден.'
+            vk_session.method('messages.send',
+                              {'user_id': int(user_id),
+                               'message': answer,
+                               'random_id': 0})
+            self.market_actions(user_id)
+            return
+        elif args == 'market.give.no':
+            pets = [user_pet for user_pet in self.all_pets.get(user_id, [])
+                    if user_pet not in [market_pet.get('pet') for market_pet in self.market.values()]]
+            self.send_pets_page(user_id, 0, pets, 'market.give')
+            return
+        elif args.startswith('market.give.page.'):
+            pets = [user_pet for user_pet in self.all_pets.get(user_id, [])
+                    if user_pet not in [market_pet.get('pet') for market_pet in self.market.values()]]
+            self.send_pets_page(user_id, int(args.replace('market.give.page.', '')), pets, 'market.give')
+            return
+        elif args == 'market.give.back':
+            self.market_actions(user_id)
+            return
+
+        elif args == 'market.back':
+            self.start(user_id)
+            return
+
+        else:
+            answer = 'Выберите действие'
+            keyboard = str(json.dumps({
+                "one_time": False,
+                "buttons": [
+                    [get_callback_button(f'Купить', 'primary', {'args': 'market.take'}),
+                     get_callback_button('Продать', 'secondary', {'args': 'market.give'})],
+                    [get_callback_button('Назад', 'negative', {'args': 'market.back'})]
                 ]
             }, ensure_ascii=False))
 
@@ -263,6 +479,11 @@ class GamePets:
                         self.shelter_actions(user_id)
                     else:
                         self.shelter_actions(user_id, args)
+                elif args.startswith('market'):
+                    if args == 'market':
+                        self.market_actions(user_id)
+                    else:
+                        self.market_actions(user_id, args)
                 elif args == 'back':
                     vk_session.method('messages.send',
                                       {'user_id': int(user_id),
@@ -270,6 +491,8 @@ class GamePets:
                                        'random_id': 0, 'keyboard': main_keyboard})
                     change_users_info(user_id, 'autoresponder')
                     return
+            elif method == 'market':
+                self.market_actions(user_id, args)
             elif method == 'store':
                 self.store(user_id, event)
             elif method.startswith('Pet.process_event'):
@@ -291,6 +514,8 @@ class GamePets:
                         break
                 else:
                     self.start(user_id)
+            elif method == 'market':
+                self.market_actions(user_id, event=event)
 
     def start(self, user_id: str):
         if self.all_pets.get(user_id) is None:
@@ -322,7 +547,8 @@ class GamePets:
 
         buttons += [[get_callback_button('Склад', 'secondary', {'args': 'storage'}),
                      get_callback_button('Магазин', 'secondary', {'args': 'store'})]]
-        buttons += [[get_callback_button('Приют', 'secondary', {'args': 'shelter'})]]
+        buttons += [[get_callback_button('Приют', 'secondary', {'args': 'shelter'}),
+                     get_callback_button('Рынок', 'secondary', {'args': 'market'})]]
         buttons += [[get_callback_button('Выйти из игры', 'negative', {'args': 'back'})]]
         keyboard = str(json.dumps({
             "one_time": False,
@@ -469,6 +695,20 @@ class GamePets:
                           {'user_id': int(user_id),
                            'message': answer,
                            'random_id': 0, 'keyboard': keyboard})
+
+
+def is_float(string):
+    """ Проверка: является ли сообщение числом.
+    :param string: str.
+
+    :return: True, если сообщение - число.
+        False - иначе.
+    """
+    try:
+        float(string)
+        return True
+    except ValueError:
+        return False
 
 
 class TemplatePet:
@@ -1781,7 +2021,8 @@ class Vampire:
         buttons = []
         if self.pet.age >= list(self.pet.ages.keys()).index('Детство'):
             if self.pet.disease is not None or self.pet.lives < 100:
-                buttons += [[get_callback_button('Использовать регенерацию (5мин)', 'primary', {'args': 'use_regeneration'})]]
+                buttons += [
+                    [get_callback_button('Использовать регенерацию (5мин)', 'primary', {'args': 'use_regeneration'})]]
             buttons += [[get_callback_button('Съесть чеснок', 'primary', {'args': 'eat_garlic'})]]
         if self.pet.age >= list(self.pet.ages.keys()).index('Юность'):
             buttons += [[get_callback_button('Обратить питомца в вампира', 'primary', {'args': 'turn_into_vampire'})]]
@@ -1922,6 +2163,7 @@ class Witch:
 
     def __init__(self, pet: Pet):
         self.pet = pet
+        self.pet.sex = 'Женщина'
         self.works = {'Фармацевт': {'skills': {'health': 40, 'intellect': 40, 'neatness': 40},
                                     'salary_per_min': 1, 'salary_in': 'food'},
                       f'Водитель аэротакси': {

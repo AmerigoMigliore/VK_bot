@@ -221,6 +221,9 @@ def async_longpoll_listen(event):
                                                                 f'{exc_type.__name__} => {exc_value} in '
                                                                 f'{threading.current_thread().name}',
                                'random_id': 0})
+        with open('log.txt', 'a') as log_file:
+            log_file.write(f'\n\n[{datetime.datetime.now(tz=tz)}]\n')
+            log_file.close()
         raise exc_longpoll
 
 
