@@ -299,6 +299,11 @@ class GamePets:
                             self.all_pets[owner_id].remove(pet)
                             self.market.pop(lot)
 
+                            vk_session.method('messages.send',
+                                              {'user_id': int(owner_id),
+                                               'message': f'Кто-то купил Вашего питомца ({pet.name})\n'
+                                                          f'{price}💰 поступили на Ваш счет.', 'random_id': 0})
+
                             new_name = pet.name
                             n = 1
                             while True:
@@ -314,6 +319,7 @@ class GamePets:
                             self.all_pets[user_id] += [pet]
 
                             pet.status = 'обрел нового хозяина!'
+                            pet.all_messages = []
                             pet.owner_id = user_id
 
                             pet.start_me()
