@@ -224,7 +224,7 @@ def async_longpoll_listen(event):
         with open('log.txt', 'a') as log_file:
             log_file.write(f'\n\n[{datetime.datetime.now(tz=tz)}]\n')
             log_file.close()
-        raise exc_longpoll
+        raise
 
 
 try:

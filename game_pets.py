@@ -26,8 +26,7 @@ class GamePets:
         for pets in self.all_pets.values():
             for pet in pets:
                 pet.stop_me()
-        return (self.all_pets, self.all_foods, self.all_pills, self.all_max_pets, self.shelter, self.all_potions,
-                self.market, self.max_lot)
+        return self.all_pets, self.all_foods, self.all_pills, self.all_max_pets, self.shelter, self.all_potions, self.market, self.max_lot
 
     def load_me(self, data):
         self.all_pets = data[0]
@@ -391,10 +390,6 @@ class GamePets:
             price = round(float(name_price[name_price.find('.') + 1:]), 2)
             for pet in self.all_pets[user_id]:
                 if pet.name == name:
-                    class Lot:
-                        def __init__(self, string):
-                            self.name = string
-
                     lot = Lot(f'Лот {self.max_lot}')
                     self.max_lot += 1
 
@@ -701,6 +696,12 @@ class GamePets:
                           {'user_id': int(user_id),
                            'message': answer,
                            'random_id': 0, 'keyboard': keyboard})
+
+
+class Lot:
+    name: str
+    def __init__(self, name):
+        self.name = name
 
 
 def is_float(string):
