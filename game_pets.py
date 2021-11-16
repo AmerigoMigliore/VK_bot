@@ -619,9 +619,9 @@ class GamePets:
                      f'5💊 - {prices.get("pill_5")}💰\n' \
                      f'10💊 - {prices.get("pill_10")}💰\n\n' \
                      f'Всемогущие эликсиры:\n' \
-                     f'1🧪 - {prices.get("potion_1")}💰' \
-                     f'5🧪 - {prices.get("potion_5")}💰' \
-                     f'10🧪 - {prices.get("potion_10")}💰' \
+                     f'1🧪 - {prices.get("potion_1")}💰\n' \
+                     f'5🧪 - {prices.get("potion_5")}💰\n' \
+                     f'10🧪 - {prices.get("potion_10")}💰\n\n' \
                      f'Дополнительное место для питомца:\n' \
                      f'1🧺 - {prices.get("home_1")}💰\n\n' \
                      f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰'
