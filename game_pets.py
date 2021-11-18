@@ -1245,6 +1245,7 @@ class Pet(TemplatePet):
         if self.game_pets.all_pills.get(self.owner_id, 0) >= treatment:
             self.game_pets.all_pills[self.owner_id] -= treatment
             self.disease = None
+            self.features_now.clear()
             self.features_now = self.features_permanent
             self.lives = 100
             self.status = f'недавно вылечил{"ся" if self.is_male() else "aсь"}'
