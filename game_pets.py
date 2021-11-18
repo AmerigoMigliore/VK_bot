@@ -1614,7 +1614,7 @@ class Pet(TemplatePet):
                             self.fall_ill()
                             answer += f'\nНа работе произошел несчастный случай, из-за чего {self.name} заболел.'
 
-                        if random.randint(50, 110) <= self.features_now.get('luck', 0):
+                        if random.randint(50, 100) <= self.features_now.get('luck', 0):
                             prize = round(random.random() * salary, 1)
                             answer += f'\nБлагодаря большому трудовому дню и своей удаче {self.name} заработал премию ' \
                                       f'в размере {prize}'
