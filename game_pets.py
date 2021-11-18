@@ -1209,6 +1209,8 @@ class Pet(TemplatePet):
         if event is None:
             keyboard = self.get_food_keyboard()
             if keyboard is None:
+                change_users_info(self.owner_id, new_method='Pet.process_event',
+                                  new_args=users_info.get(self.owner_id, {}).get('args'))
                 answer = 'В Вашем хранилище нет еды'
                 keyboard = self.get_main_keyboard()
             else:
@@ -1238,6 +1240,11 @@ class Pet(TemplatePet):
                              f'У него в кормушке: {round(self.food, 1)}🍎\n' \
                              f'У Вас в хранилище: {self.game_pets.all_foods[self.owner_id]}🍎'
                     keyboard = self.get_food_keyboard()
+                    if keyboard is None:
+                        change_users_info(self.owner_id, new_method='Pet.process_event',
+                                          new_args=users_info.get(self.owner_id, {}).get('args'))
+                        answer = 'В Вашем хранилище нет еды'
+                        keyboard = self.get_main_keyboard()
                 else:
                     answer = f'Недостаточно 🍎.\n' \
                              f'У Вас в хранилище: {self.game_pets.all_foods[self.owner_id]}🍎'
@@ -2364,7 +2371,7 @@ class Witch:
                     self.pet.food -= 50
                     self.pet.action = f'готовит зелье'
                     self.pet.timer_action = threading.Timer(60 * 60 * 5, function=self.create_potion,
-                                                            args=['potion.cheap', True])
+                                                            args=['create_potion.cheap', True])
                     self.pet.timer_action.start()
                     self.pet.time_finish_action = datetime.now(tz=tz) + timedelta(seconds=60 * 60 * 5)
                     answer = f'{self.pet.name} начал{"" if self.pet.is_male() else "a"} готовить дешевое зелье.'
