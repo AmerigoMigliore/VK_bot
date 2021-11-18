@@ -77,6 +77,8 @@ def main():
         except requests.exceptions.ReadTimeout:
             sys.stderr.write(f'\n\n[{datetime.datetime.now()}]\n'
                              f'Переподключение к серверам VK...')
+        except KeyboardInterrupt:
+            raise
         except:
             sys.stderr.write(f'\n\n[{datetime.datetime.now()}] : main\n')
             traceback.print_exc()
