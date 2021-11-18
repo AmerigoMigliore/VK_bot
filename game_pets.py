@@ -1,4 +1,5 @@
 import json
+import math
 import random
 import threading
 from data import change_users_info, main_keyboard, users_info, tz
@@ -485,6 +486,10 @@ class GamePets:
                         self.market_actions(user_id)
                     else:
                         self.market_actions(user_id, args)
+                elif args == 'give_food_to_all_pets':
+                    change_users_info(user_id, new_method='give_food_to_all_pets')
+                    self.give_food_to_all_pets(user_id)
+                    return
                 elif args == 'back':
                     vk_session.method('messages.send',
                                       {'user_id': int(user_id),
@@ -492,6 +497,8 @@ class GamePets:
                                        'random_id': 0, 'keyboard': main_keyboard})
                     change_users_info(user_id, 'autoresponder')
                     return
+            elif method == 'give_food_to_all_pets':
+                self.give_food_to_all_pets(user_id, event)
             elif method == 'market':
                 self.market_actions(user_id, args)
             elif method == 'store':
@@ -540,14 +547,16 @@ class GamePets:
             pets_str = 'питомцев'
 
         buttons = []
-        if len(self.all_pets[user_id]) > 0:
+        if len(self.all_pets.get(user_id, 0)) > 0:
             pets_str += ':\n'
-            buttons += [[get_callback_button('Мои питомцы', 'primary', {'args': 'pets'})]]
+            buttons += [[get_callback_button('Мои питомцы', 'positive', {'args': 'pets'})]]
+            if self.all_foods.get(user_id, 0) >= len(self.all_pets.get(user_id, 0)):
+                buttons[0] += [get_callback_button('Покормить всех', 'positive', {'args': 'give_food_to_all_pets'})]
         for x in self.all_pets[user_id]:
             pets_str += f'\n{x.get_status()}\n'
 
-        buttons += [[get_callback_button('Склад', 'secondary', {'args': 'storage'}),
-                     get_callback_button('Магазин', 'secondary', {'args': 'store'})]]
+        buttons += [[get_callback_button('Склад', 'primary', {'args': 'storage'}),
+                     get_callback_button('Магазин', 'primary', {'args': 'store'})]]
         buttons += [[get_callback_button('Приют', 'secondary', {'args': 'shelter'}),
                      get_callback_button('Рынок', 'secondary', {'args': 'market'})]]
         buttons += [[get_callback_button('Выйти из игры', 'negative', {'args': 'back'})]]
@@ -565,6 +574,66 @@ class GamePets:
 
         change_users_info(user_id, new_method='start')
 
+    def give_food_to_all_pets_keyboard(self, user_id):
+        food_per_pet = math.floor(self.all_foods.get(user_id, 0) / len(self.all_pets.get(user_id)))
+        buttons = [[]]
+        if food_per_pet == 0:
+            return None
+        if food_per_pet >= 1:
+            buttons[0] += [get_callback_button('1🍎', 'positive', {'args': 'give_food_1'})]
+        if food_per_pet >= 10:
+            buttons[0] += [get_callback_button('10🍎', 'positive', {'args': 'give_food_10'})]
+        if food_per_pet >= 50:
+            buttons[0] += [get_callback_button('50🍎', 'positive', {'args': 'give_food_50'})]
+        if food_per_pet >= 100:
+            buttons[0] += [get_callback_button('100🍎', 'positive', {'args': 'give_food_100'})]
+        if food_per_pet > 0:
+            buttons += [[get_callback_button(f'{food_per_pet}🍎', 'positive', {'args': f'give_food_{food_per_pet}'})]]
+        buttons += [[get_callback_button('Назад', 'negative', {'args': 'back'})]]
+        return str(json.dumps({"one_time": False, "buttons": buttons}, ensure_ascii=False))
+
+    def give_food_to_all_pets(self, user_id: str, event=None):
+        keyboard = None
+        if event is None:
+            keyboard = self.give_food_to_all_pets_keyboard(user_id)
+            if keyboard is None:
+                answer = 'В Вашем хранилище недостаточно еды, чтобы покормить каждого питомца'
+                vk_session.method('messages.send', {'user_id': int(user_id), 'message': answer, 'random_id': 0})
+                self.start(user_id)
+                return
+            else:
+                answer = f'Выберите количество еды для питомцев\n' \
+                         f'У Вас в хранилище: {self.all_foods[user_id]}🍎'
+        else:
+            args = event.obj.payload.get('args')
+            answer = ''
+            if args.startswith('give_food_'):
+                food = int(args.replace('give_food_', ''))
+            else:
+                self.start(user_id)
+                return
+
+            if food is not None:
+                if self.all_foods.get(user_id, 0) >= food * len(self.all_pets.get(user_id)):
+                    self.all_foods[user_id] -= food * len(self.all_pets.get(user_id))
+                    for pet in self.all_pets.get(user_id):
+                        pet.food += food
+                    answer = f'Вы дали всем питомцам по {food}🍎.\n' \
+                             f'У Вас в хранилище: {self.all_foods.get(user_id, 0)}🍎'
+                    keyboard = self.give_food_to_all_pets_keyboard(user_id)
+                    if keyboard is None:
+                        answer = 'В Вашем хранилище недостаточно еды, чтобы покормить каждого питомца'
+                        vk_session.method('messages.send', {'user_id': int(user_id), 'message': answer, 'random_id': 0})
+                        self.start(user_id)
+                        return
+                else:
+                    answer = f'Недостаточно 🍎.\n' \
+                             f'У Вас в хранилище: {self.all_foods.get(user_id, 0)}🍎'
+
+        if answer != '':
+            vk_session.method('messages.send', {'user_id': int(user_id), 'message': answer, 'random_id': 0,
+                                                'keyboard': keyboard})
+
     def get_storage(self, user_id: str):
         vk_session.method('messages.send',
                           {'user_id': int(user_id),
@@ -577,7 +646,8 @@ class GamePets:
                            'random_id': 0})
 
     def store(self, user_id: str, event=None):
-        prices = {'pet': 10, 'food_1': 0.2, 'food_10': 1.5, 'food_100': 10, 'pill_1': 5, 'pill_5': 20, 'pill_10': 30,
+        prices = {'pet': 10, 'food_1': 0.2, 'food_10': 1.5, 'food_100': 10, 'food_500': 40, 'pill_1': 5, 'pill_5': 20,
+                  'pill_10': 30,
                   'home_1': 50, 'potion_1': 50, 'potion_5': 230, 'potion_10': 400}
         keyboard = str(json.dumps({
             "one_time": False,
@@ -586,7 +656,8 @@ class GamePets:
 
                 [get_callback_button('1🍎', 'positive', {'args': 'food_1'}),
                  get_callback_button('10🍎', 'positive', {'args': 'food_10'}),
-                 get_callback_button('100🍎', 'positive', {'args': 'food_100'})],
+                 get_callback_button('100🍎', 'positive', {'args': 'food_100'}),
+                 get_callback_button('500🍎', 'positive', {'args': 'food_500'})],
 
                 [get_callback_button('1💊', 'positive', {'args': 'pill_1'}),
                  get_callback_button('5💊', 'positive', {'args': 'pill_5'}),
@@ -608,7 +679,8 @@ class GamePets:
                      f'Еда для питомца:\n' \
                      f'1🍎 - {prices.get("food_1")}💰\n' \
                      f'10🍎 - {prices.get("food_10")}💰\n' \
-                     f'100🍎 - {prices.get("food_100")}💰\n\n' \
+                     f'100🍎 - {prices.get("food_100")}💰\n' \
+                     f'500🍎 - {prices.get("food_500")}💰\n\n' \
                      f'Лекарство для питомца:\n' \
                      f'1💊 - {prices.get("pill_1")}💰\n' \
                      f'5💊 - {prices.get("pill_5")}💰\n' \
@@ -1116,15 +1188,19 @@ class Pet(TemplatePet):
         return f'До следующей стадии "{list(self.ages.keys())[self.age + 1]}" еще {time.days} {days}, {timedelta(seconds=time.seconds)}'
 
     def get_food_keyboard(self):
-        buttons = [[get_callback_button('1🍎', 'positive', {'args': 'give_food_1'}),
-                    get_callback_button('10🍎', 'positive', {'args': 'give_food_10'}),
-                    get_callback_button('50🍎', 'positive', {'args': 'give_food_50'}),
-                    get_callback_button('100🍎', 'positive', {'args': 'give_food_100'})]]
-        if self.game_pets.all_foods.get(self.owner_id, 0) > 0:
-            buttons += [[get_callback_button(
-                f'{self.game_pets.all_foods.get(self.owner_id)}🍎',
-                'positive', {'args': 'give_food_all'}
-            )]]
+        all_food = self.game_pets.all_foods.get(self.owner_id, 0)
+        buttons = [[]]
+        if all_food == 0:
+            return None
+        if all_food >= 1:
+            buttons[0] += [get_callback_button('1🍎', 'positive', {'args': 'give_food_1'})]
+        if all_food >= 10:
+            buttons[0] += [get_callback_button('10🍎', 'positive', {'args': 'give_food_10'})]
+        if all_food >= 50:
+            buttons[0] += [get_callback_button('50🍎', 'positive', {'args': 'give_food_50'})]
+        if all_food >= 100:
+            buttons[0] += [get_callback_button('100🍎', 'positive', {'args': 'give_food_100'})]
+        buttons += [[get_callback_button(f'{all_food}🍎', 'positive', {'args': 'give_food_all'})]]
         buttons += [[get_callback_button('Назад', 'negative', {'args': 'back'})]]
         return str(json.dumps({"one_time": False, "buttons": buttons}, ensure_ascii=False))
 
@@ -1132,7 +1208,13 @@ class Pet(TemplatePet):
         keyboard = None
         if event is None:
             keyboard = self.get_food_keyboard()
-            answer = 'Выберите количество еды для питомца'
+            if keyboard is None:
+                answer = 'В Вашем хранилище нет еды'
+                keyboard = self.get_main_keyboard()
+            else:
+                answer = f'Выберите количество еды для питомца\n' \
+                         f'У него в кормушке: {round(self.food, 1)}🍎\n' \
+                         f'У Вас в хранилище: {self.game_pets.all_foods[self.owner_id]}🍎'
         else:
             args = event.obj.payload.get('args')
             food = None
@@ -1142,15 +1224,11 @@ class Pet(TemplatePet):
                     food = self.game_pets.all_foods.get(self.owner_id)
                 else:
                     food = int(args.replace('give_food_', ''))
-            elif args == 'back':
+            else:
                 change_users_info(self.owner_id, new_method='Pet.process_event',
                                   new_args=users_info.get(self.owner_id, {}).get('args'))
                 answer = 'Вы закончили кормление питомца'
                 keyboard = self.get_main_keyboard()
-            else:
-                answer = f'Выберите количество еды для питомца\n' \
-                         f'У него в кормушке: {round(self.food, 1)}🍎\n' \
-                         f'У Вас в хранилище: {self.game_pets.all_foods[self.owner_id]}🍎'
 
             if food is not None:
                 if self.game_pets.all_foods[self.owner_id] >= food:
