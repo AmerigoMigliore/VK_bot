@@ -1473,17 +1473,17 @@ class Pet(TemplatePet):
                               f'Требуется: 0.5💰'
             else:
                 if random.randint(1, 110) <= success:
-                    users_info[self.owner_id]["balance"] += 5
+                    users_info[self.owner_id]["balance"] += 10
                     answer_ = f'{self.name} выиграл{"" if self.is_male() else "a"} соревнования по {text_competition} ' \
-                              f'и заработал{"" if self.is_male() else "a"} 5💰'
+                              f'и заработал{"" if self.is_male() else "a"} 10💰'
                 else:
                     if self.features_now.get('luck', 0) > 0 and random.randint(0, 100) <= self.features_now.get('luck'):
-                        users_info[self.owner_id]["balance"] += 3
+                        users_info[self.owner_id]["balance"] += 5
                         answer_ = f'{self.name} ничего не выиграл{"" if self.is_male() else "a"} на соревнованиях ' \
                                   f'по {text_competition}, но удача оказалась на {"его" if self.is_male() else "ее"} ' \
-                                  f'стороне, и спонсоры выдали поощрительный приз 3💰'
+                                  f'стороне, и спонсоры выдали поощрительный приз 5💰'
                     else:
-                        answer_ = f'{self.name} занял{"" if self.is_male() else "a"} {random.randint(2, 100)} место ' \
+                        answer_ = f'{self.name} занял{"" if self.is_male() else "a"} {random.randint(4, 100)} место ' \
                                   f'на соревнованиях по {text_competition} и ничего не ' \
                                   f'заработал{"" if self.is_male() else "a"}'
 
