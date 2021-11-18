@@ -1428,7 +1428,8 @@ class Pet(TemplatePet):
     def plant_bone(self, is_finish=False):
         if is_finish:
             self.action = None
-            if bool(random.randint(0, 1)):
+            success = max(20, self.features_now.get('neatness') * 0.6 + self.features_now.get('luck') * 0.6)
+            if random.randint(0, 100) <= success:
                 self.bones += 1
                 answer = f'{self.name} посадил{"" if self.is_male() else "a"} косточку!'
             else:
@@ -1605,12 +1606,25 @@ class Pet(TemplatePet):
                         users_info[self.owner_id]["balance"] += salary
                         answer += '💰'
                     else:
-                        self.food += salary
+                        self.game_pets.all_foods[self.owner_id] += salary
                         answer += '🍎'
 
-                    if work_time >= 180 and random.randint(0, 10) == 0:
-                        self.fall_ill()
-                        answer += f'\nНа работе произошел несчастный случай, из-за чего {self.name} заболел.'
+                    if work_time >= 180:
+                        if random.randint(0, 20) == 0:
+                            self.fall_ill()
+                            answer += f'\nНа работе произошел несчастный случай, из-за чего {self.name} заболел.'
+
+                        if random.randint(50, 110) <= self.features_now.get('luck', 0):
+                            prize = round(random.random() * salary, 1)
+                            answer += f'\nБлагодаря большому трудовому дню и своей удаче {self.name} заработал премию ' \
+                                      f'в размере {prize}'
+                            if all_works.get(self.work_name).get('salary_in') == 'money':
+                                users_info[self.owner_id]["balance"] += prize
+                                answer += '💰'
+                            else:
+                                self.game_pets.all_foods[self.owner_id] += prize
+                                answer += '🍎'
+
                 else:
                     self.work_name = args.replace('work.', '')
                     self.action = f'работает ({self.work_name})'
