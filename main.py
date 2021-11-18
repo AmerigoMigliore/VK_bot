@@ -2,6 +2,7 @@
 import datetime
 import sys
 import threading
+import traceback
 
 import requests
 
@@ -55,7 +56,18 @@ def del_from_stop_list(user_id):
 
 
 def main():
-    sys.stderr = open(f'log.txt', 'a')
+    # Создание нового (!) файла с логами
+    n = 0
+    while True:
+        try:
+            sys.stderr = open(f'log_{n}.txt', 'x')
+        except FileExistsError:
+            n += 1
+        else:
+            sys.stderr.write(f'LOGS STARTED ON {datetime.datetime.now()}')
+            sys.stderr.flush()
+            break
+
     while True:
         try:
             for event in longpoll.listen():
@@ -63,7 +75,11 @@ def main():
 
         # Обработка длительного ожидания от longpoll
         except requests.exceptions.ReadTimeout:
-            pass
+            sys.stderr.write(f'\n\n[{datetime.datetime.now()}]\n'
+                             f'Переподключение к серверам VK...')
+        except:
+            sys.stderr.write(f'\n\n[{datetime.datetime.now()}] : main\n')
+            traceback.print_exc()
 
 
 def async_longpoll_listen(event):
@@ -201,7 +217,7 @@ def async_longpoll_listen(event):
                     vk_session.method('messages.send',
                                       {'user_id': int(user_id), 'random_id': 0, 'sticker_id': 9425})
 
-    except Exception as exc_longpoll:
+    except:
         user_id = event.obj.from_id
         if user_id is None:
             user_id = event.obj.user_id
@@ -221,16 +237,18 @@ def async_longpoll_listen(event):
                                                                 f'{exc_type.__name__} => {exc_value} in '
                                                                 f'{threading.current_thread().name}',
                                'random_id': 0})
-        with open('log.txt', 'a') as log_file:
-            log_file.write(f'\n\n[{datetime.datetime.now(tz=tz)}]\n')
-            log_file.close()
-        raise
+        sys.stderr.write(f'\n\n[{datetime.datetime.now()}] : async_longpoll_listen : FROM ID {user_id}\n')
+        traceback.print_exc()
 
 
 try:
     main()
 except KeyboardInterrupt:
-    raise
+    sys.stderr.write(f'\n\n[{datetime.datetime.now()}] : KeyboardInterrupt\n')
+    traceback.print_exc()
+except:
+    sys.stderr.write(f'\n\n[{datetime.datetime.now()}] : SMTH CRITICAL\n')
+    traceback.print_exc()
 finally:
     save_all()
     print("\033[1m\033[32m\033[40mBye!\033[0m")
