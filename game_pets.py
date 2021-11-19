@@ -859,7 +859,7 @@ class TemplatePet:
                 'skills': {'intellect': 70, 'industriousness': 70, 'neatness': 70},
                 'salary_per_min': 0.2, 'salary_in': 'money'},
             'Дрессировщик сов': {
-                'skills': {'power': 20, 'speed': 20, 'neatness': 20},
+                'skills': {'power': 50, 'speed': 40, 'neatness': 40},
                 'salary_per_min': 0.1, 'salary_in': 'money'},
             'Искатель акций и скидок': {
                 'skills': {'industriousness': 50, 'luck': 50},
