@@ -1428,7 +1428,20 @@ class Pet(TemplatePet):
             if self.action is not None and self.action.startswith('работает'):
                 buttons += [[get_callback_button('Вернуться с работы', 'negative', {'args': 'work.finish'})]]
             elif self.action is None:
-                buttons += [[get_callback_button('Идти на работу', 'positive', {'args': 'work'})]]
+                if (
+                        self.features_now.get('work_time_night') and
+                        datetime_time(hour=21) <= datetime.now(tz=tz).time() <= datetime_time(hour=23,
+                                                                                              minute=59,
+                                                                                              second=59) or
+                        datetime_time(hour=0) <= datetime.now(tz=tz).time() < datetime_time(hour=9)
+                ) or (
+                        (
+                                not self.features_now.get('work_time_night')
+                        ) and (
+                                datetime_time(hour=9) <= datetime.now(tz=tz).time() < datetime_time(hour=21)
+                        )
+                ):
+                    buttons += [[get_callback_button('Идти на работу', 'positive', {'args': 'work'})]]
 
         if self.action is None:
             if self.age >= list(self.ages.keys()).index('Детство'):
@@ -1436,13 +1449,14 @@ class Pet(TemplatePet):
                     buttons += [
                         [get_callback_button('Посадить косточку (1🍎, 1мин)', 'secondary', {'args': 'plant_bone'})]]
             if self.age >= list(self.ages.keys()).index('Юность'):
-                if self.age != list(self.ages.keys()).index('Зрелость'):
-                    for value in self.features_now.values():
-                        if value < 100:
-                            buttons += [[get_callback_button('Принять эликсир', 'secondary', {'args': 'potion'})]]
-                            break
-                else:
-                    buttons += [[get_callback_button('Принять эликсир', 'secondary', {'args': 'potion'})]]
+                if self.game_pets.all_potions.get(self.owner_id, 0) > 0:
+                    if self.age != list(self.ages.keys()).index('Зрелость'):
+                        for value in self.features_now.values():
+                            if value < 100:
+                                buttons += [[get_callback_button('Принять эликсир', 'secondary', {'args': 'potion'})]]
+                                break
+                    else:
+                        buttons += [[get_callback_button('Принять эликсир', 'secondary', {'args': 'potion'})]]
                 buttons += [[get_callback_button('Соревнования (0.5💰, 30мин)', 'secondary', {'args': 'competition'})]]
             buttons += self.identified_pet.get_action_buttons()
 
