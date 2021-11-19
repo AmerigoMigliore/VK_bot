@@ -472,7 +472,7 @@ class GameMath:
 
             else:
                 message = f'Недостаточно 💰 для совершения обмена\n' \
-                          f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 1)}💰\n'
+                          f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 2)}💰\n'
         else:
             keyboard = str(json.dumps(
                 {

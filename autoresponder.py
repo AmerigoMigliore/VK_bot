@@ -951,7 +951,7 @@ class Autoresponder:
 
     @staticmethod
     def get_balance(arg, user_id):
-        return f'Ваш баланс: {round(users_info[user_id]["balance"], 1)}💰'
+        return f'Ваш баланс: {round(users_info[user_id]["balance"], 2)}💰'
 
     def give_money(self, arg, admin_id):
         admin_id = str(admin_id)
@@ -974,10 +974,10 @@ class Autoresponder:
                               {'user_id': int(split[0]),
                                'message': f'Вам начислено "{split[1]}"💰 пользователем "{name}" '
                                           f'уровня "{users_info.get(admin_id).get("role")}"\n'
-                                          f'Баланс: {round(users_info[str(split[0])]["balance"], 1)}💰',
+                                          f'Баланс: {round(users_info[str(split[0])]["balance"], 2)}💰',
                                'random_id': 0})
             return f'Пользователю "{split[0]}" начислено {split[1]}💰.\n' \
-                   f'Баланс: {round(users_info[str(split[0])]["balance"], 1)}💰'
+                   f'Баланс: {round(users_info[str(split[0])]["balance"], 2)}💰'
 
     @staticmethod
     def game_start(arg, user_id, message=None):
