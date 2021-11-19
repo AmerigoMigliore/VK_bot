@@ -108,6 +108,11 @@ class GamePets:
                 ]
             }, ensure_ascii=False))
         elif args.startswith('shelter.take.yes'):
+            if self.all_max_pets.get(user_id) <= len(self.all_pets.get(user_id)):
+                answer = 'У Вас имеется максимально допустимое количество питомцев'
+                vk_session.method('messages.send', {'user_id': int(user_id), 'message': answer, 'random_id': 0})
+                self.send_pets_page(user_id, 0, self.shelter, 'shelter.take')
+                return
             if users_info.get(user_id, {}).get("balance", 0) >= self.shelter_price:
                 users_info[user_id]["balance"] -= self.shelter_price
 
@@ -142,10 +147,7 @@ class GamePets:
                          f'Ваш баланс: {round(users_info.get(user_id, {}).get("balance", 0), 2)}💰\n' \
                          f'Требуется: {round(self.shelter_price, 2)}💰'
 
-            vk_session.method('messages.send',
-                              {'user_id': int(user_id),
-                               'message': answer,
-                               'random_id': 0})
+            vk_session.method('messages.send', {'user_id': int(user_id), 'message': answer, 'random_id': 0})
             self.shelter_actions(user_id)
             return
         elif args == 'shelter.take.no':
@@ -284,6 +286,11 @@ class GamePets:
                 answer = f'{lot_name} не найден на рынке. Возможно, кто-то уже купил его или питомец был ' \
                          f'переведен в другой домик. Такое иногда случается'
         elif args.startswith('market.take.yes'):
+            if self.all_max_pets.get(user_id) <= len(self.all_pets.get(user_id)):
+                answer = 'У Вас имеется максимально допустимое количество питомцев'
+                vk_session.method('messages.send', {'user_id': int(user_id), 'message': answer, 'random_id': 0})
+                self.send_pets_page(user_id, 0, list(self.market.keys()), 'market.take')
+                return
             lot_name = args.replace('market.take.yes.', '')
             for lot in self.market.keys():
                 if lot.name == lot_name:
