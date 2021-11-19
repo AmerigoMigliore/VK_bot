@@ -859,7 +859,7 @@ class TemplatePet:
                 'skills': {'intellect': 70, 'industriousness': 70, 'neatness': 70},
                 'salary_per_min': 0.2, 'salary_in': 'money'},
             'Дрессировщик сов': {
-                'skills': {'power': 50, 'speed': 40, 'neatness': 40},
+                'skills': {'power': 20, 'speed': 20, 'neatness': 20},
                 'salary_per_min': 0.1, 'salary_in': 'money'},
             'Искатель акций и скидок': {
                 'skills': {'industriousness': 50, 'luck': 50},
@@ -1305,7 +1305,7 @@ class Pet(TemplatePet):
                 self.lives -= (100 - self.features_now.get('health', 0)) / 10
 
             if self.lives <= 0:
-                self.leave(is_elderly=False)
+                self.leave(False)
                 return
 
         elif self.satiety == 100 and self.lives < 100:
