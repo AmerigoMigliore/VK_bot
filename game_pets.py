@@ -1283,18 +1283,15 @@ class Pet(TemplatePet):
         if self.bones > 0:
             self.food += self.food_from_bone * self.bones
 
-        if self.satiety >= 5:
-            self.satiety -= 5
-        else:
-            self.satiety = 0
+        food_per_meal = self.features_now.get('food_per_meal', 2)
+        satiety_per_meal = food_per_meal * 2
 
-        while self.food >= self.features_now.get('food_per_meal', 2):
+        self.satiety -= satiety_per_meal if self.satiety >= satiety_per_meal else self.satiety
+
+        while self.food >= food_per_meal:
             if self.satiety < 100:
-                self.food -= self.features_now.get('food_per_meal', 2)
-                if self.satiety <= 95:
-                    self.satiety += 5
-                else:
-                    self.satiety = 100
+                self.food -= food_per_meal
+                self.satiety += satiety_per_meal if self.satiety <= 100 - satiety_per_meal else 100 - self.satiety
                 self.status = f'покушал{"" if self.is_male() else "a"}'
             else:
                 break
@@ -1308,7 +1305,7 @@ class Pet(TemplatePet):
                 self.lives -= (100 - self.features_now.get('health', 0)) / 10
 
             if self.lives <= 0:
-                self.leave(False)
+                self.leave(is_elderly=False)
                 return
 
         elif self.satiety == 100 and self.lives < 100:
